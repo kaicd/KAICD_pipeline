@@ -41,7 +41,7 @@ class VAE(pl.LightningModule):
         self.smiles_language = SMILESLanguage.load(self.smiles_language_filepath)
         self.batch_mode = params.get("batch_mode")
         self.selfies = params.get("selfies", False)
-        self.data_preparation = get_data_preparation(self.batch_mode)
+        self.data_preparation = self.get_data_preparation(self.batch_mode)
         self.search = SEARCH_FACTORY[params.get("decoder_search", "sampling")](
             temperature=params.get("temperature", 1.0),
             beam_width=params.get("beam_width", 3),
@@ -53,6 +53,8 @@ class VAE(pl.LightningModule):
         self.input_keep = params["input_keep"]
         self.start_index = 2
         self.end_index = 3
+        self.epochs = params.get("epochs", 100)
+        self.lr = params.get("learning_rate", 0.0005)
 
     def encode(self, input_seq):
         """
@@ -155,25 +157,6 @@ class VAE(pl.LightningModule):
 
         return molecule_iter
 
-    def _associate_language(self, language):
-        """
-        Bind a SMILES language object to the model.
-        Arguments:
-            language  [pytoda.smiles.smiles_language.SMILESLanguage] --
-                A SMILES language object either supporting SMILES or SELFIES
-        Raises:
-            TypeError:
-        """
-        if isinstance(language, pytoda.smiles.smiles_language.SMILESLanguage):
-            self.smiles_language = language
-
-        else:
-            raise TypeError(
-                "Please insert a smiles language (object of type "
-                "pytoda.smiles.smiles_language.SMILESLanguage . Given was "
-                f"{type(language)}"
-            )
-
     def _prepare_packed(self, batch, input_keep, start_index, end_index, device):
         encoder_seq, decoder_seq, target_seq = packed_sequential_data_preparation(
             batch, input_keep=input_keep, start_index=start_index, end_index=end_index
@@ -201,7 +184,7 @@ class VAE(pl.LightningModule):
         if not isinstance(mode, str):
             raise TypeError("Argument `mode` should be a string.")
         mode = mode.capitalize()
-        MODES = {"Padded": _prepare_padded, "Packed": _prepare_packed}
+        MODES = {"Padded": self._prepare_padded, "Packed": self._prepare_packed}
         if mode not in MODES:
             raise NotImplementedError(
                 f"Unknown mode: {mode}. Available modes: {MODES.keys()}"
@@ -244,14 +227,18 @@ class VAE(pl.LightningModule):
         )
 
         decoder_loss, mu, logvar = self(encoder_seq, decoder_seq, target_seq)
-        loss, kl_div = vae_loss_function(decoder_loss, mu, logvar, kl_growth=self.kl_growth, step=self.global_step)
+        loss, kl_div = vae_loss_function(
+            decoder_loss, mu, logvar, kl_growth=self.kl_growth, step=self.global_step
+        )
         self.log("train_loss", loss)
         self.log("train_kl_div", kl_div)
 
         if self.batch_mode == "packed":
             target_seq = unpack_sequence(target_seq)
 
-        target, pred = print_example_reconstruction(self.decoder.outputs, target_seq, self.smiles_language, self.selfies)
+        target, pred = print_example_reconstruction(
+            self.decoder.outputs, target_seq, self.smiles_language, self.selfies
+        )
         mol = Chem.MolFromSmiles(target)
         molt = Chem.MolFromSmiles(pred)
         mols = np.array(Draw.MolToImage([mol, molt]))
@@ -272,27 +259,46 @@ class VAE(pl.LightningModule):
 
         decoder_loss, mu, logvar = self(encoder_seq, decoder_seq, target_seq)
 
-        return {"decoder_loss": decoder_loss, "mu": mu, "logvar": logvar}
+        return {
+            "decoder_loss": decoder_loss,
+            "mu": mu,
+            "logvar": logvar,
+            "target_seq": target_seq,
+        }
 
     def validation_epoch_end(selfself, outputs):
         decoder_losses = []
         mus = []
         logvars = []
+        target_seqs = []
 
         for o in outputs:
             decoder_losses.append(o["decoder_loss"])
             mus.append(o["mu"])
             logvars.append(o["logvar"])
+            target_seqs.append(o["target_seq"])
 
-        decoder_loss = th.cat[decoder_losses]
-        mu = th.cat[mus]
-        logvar = th.cat[logvars]
+        decoder_loss = th.cat(decoder_losses)
+        mu = th.cat(mus)
+        logvar = th.cat(logvars)
+        target_seq = th.cat(target_seqs)
 
         loss, kl_div = vae_loss_function(decoder_loss, mu, logvar, eval_mode=True)
         self.log("val_loss", loss)
-        self.log("val_kkl_div", kl_div)
+        self.log("val_kl_div", kl_div)
 
-        return loss, kl_div
+        if self.batch_mode == "packed":
+            target_seq = unpack_sequence(target_seq)
+
+        target, pred = print_example_reconstruction(
+            self.decoder.outputs, target_seq, self.smiles_language, self.selfies
+        )
+        mol = Chem.MolFromSmiles(target)
+        molt = Chem.MolFromSmiles(pred)
+        mols = np.array(Draw.MolToImage([mol, molt]))
+
+        if mol and molt:
+            self.log("val_mol_img", Image(mols))
 
     def configure_optimizers(self):
         opt = self.opt_fn(self.parameters(), lr=self.lr)
@@ -307,3 +313,22 @@ class VAE(pl.LightningModule):
         }
 
         return [opt], [sched]
+
+    def _associate_language(self, language):
+        """
+        Bind a SMILES language object to the model.
+        Arguments:
+            language  [pytoda.smiles.smiles_language.SMILESLanguage] --
+                A SMILES language object either supporting SMILES or SELFIES
+        Raises:
+            TypeError:
+        """
+        if isinstance(language, pytoda.smiles.smiles_language.SMILESLanguage):
+            self.smiles_language = language
+
+        else:
+            raise TypeError(
+                "Please insert a smiles language (object of type "
+                "pytoda.smiles.smiles_language.SMILESLanguage . Given was "
+                f"{type(language)}"
+            )

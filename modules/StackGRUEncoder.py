@@ -30,7 +30,7 @@ class StackGRUEncoder(StackGRU):
             bidirectional (bool, optional): Whether to train a bidirectional
                 GRU. Defaults to False.
         """
-        super(StackGRUEncoder, self).__init__()
+        super(StackGRUEncoder, self).__init__(params)
 
         self.bidirectional = params.get("bidirectional", False)
         self.n_directions = 2 if self.bidirectional else 1

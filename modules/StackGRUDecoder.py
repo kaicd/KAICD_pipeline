@@ -2,7 +2,8 @@ import torch as th
 import torch.nn as nn
 import pytoda
 from paccmann_chemistry.models.stack_rnn import StackGRU
-
+from paccmann_chemistry.utils.search import SamplingSearch
+from paccmann_chemistry.utils.hyperparams import OPTIMIZER_FACTORY
 
 class StackGRUDecoder(StackGRU):
     """Stacked GRU Decoder."""
@@ -30,7 +31,7 @@ class StackGRUDecoder(StackGRU):
             bidirectional (bool, optional): Whether to train a bidirectional
                 GRU. Defaults to False.
         """
-        super(StackGRUDecoder, self).__init__()
+        super(StackGRUDecoder, self).__init__(params)
 
         self.latent_dim = params["latent_dim"]
         self.latent_to_hidden = nn.Linear(
