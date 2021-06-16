@@ -18,7 +18,7 @@ parser.add_argument("--project", type=str, default="PaccMann_sarscov2")
 parser.add_argument(
     "--project_filepath",
     type=str,
-    default="/home/lhs/paccmann_sarscov2/",
+    default="/raid/PaccMann_sarscov2/",
     help="Path to the paccmann_sarscov2 project file.",
 )
 parser.add_argument(
@@ -44,7 +44,7 @@ parser.add_argument(
 parser.add_argument(
     "--params_filepath",
     type=str,
-    default="code/paccmann_predictor/examples/affinity/affinity.json",
+    default="utils/affinity.json",
     help="Path to the parameter file.",
 )
 

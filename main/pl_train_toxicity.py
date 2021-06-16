@@ -16,7 +16,7 @@ parser.add_argument("--project", type=str, default="PaccMann_sarscov2")
 parser.add_argument(
     "--project_filepath",
     type=str,
-    default="/home/lhs/paccmann_sarscov2/",
+    default="/raid/PaccMann_sarscov2",
     help="Path to the paccmann_sarscov2 project file.",
 )
 parser.add_argument(
@@ -30,7 +30,7 @@ parser.add_argument("--seed", type=int, default=42)
 parser.add_argument(
     "--params_filepath",
     type=str,
-    default="code/toxsmi/params/mca.json",
+    default="utils/toxsmi.json",
     help="Path to the parameter file.",
 )
 parser.add_argument(
