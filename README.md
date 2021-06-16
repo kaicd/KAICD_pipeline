@@ -30,4 +30,6 @@ Also, the workload required to run the full pipeline is intensive and might not 
 It will be implemented soon...
 
 ### SELFIES VAE
-It will be implemented soon...
+```console
+(paccmann_sarscov2) $ python PYTHONPATH='./' python ./main/pl_train_selfies.py
+```
