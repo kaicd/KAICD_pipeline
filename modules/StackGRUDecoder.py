@@ -2,6 +2,11 @@ import torch as th
 import torch.nn as nn
 import pytoda
 from paccmann_chemistry.models.stack_rnn import StackGRU
+from paccmann_chemistry.utils import (
+    perpare_packed_input,
+    manage_step_packed_vars,
+    packed_to_padded
+)
 from paccmann_chemistry.utils.search import SamplingSearch
 from paccmann_chemistry.utils.hyperparams import OPTIMIZER_FACTORY
 
@@ -109,18 +114,18 @@ class StackGRUDecoder(StackGRU):
             raise TypeError("Input is not PackedSequence")
 
         loss = 0
-        input_seq_packed, batch_sizes = utils.perpare_packed_input(input_seq)
+        input_seq_packed, batch_sizes = perpare_packed_input(input_seq)
         # Target sequence should have same batch_sizes as input_seq
-        target_seq_packed, _ = utils.perpare_packed_input(target_seq)
+        target_seq_packed, _ = perpare_packed_input(target_seq)
         prev_batch = batch_sizes[0]
         outputs = []
         for idx, (input_entry, target_entry, batch_size) in enumerate(
             zip(input_seq_packed, target_seq_packed, batch_sizes)
         ):
-            _, hidden = utils.manage_step_packed_vars(
+            _, hidden = manage_step_packed_vars(
                 None, hidden, batch_size, prev_batch, batch_dim=1
             )
-            _, stack = utils.manage_step_packed_vars(
+            _, stack = manage_step_packed_vars(
                 None, stack, batch_size, prev_batch, batch_dim=0
             )
 
@@ -132,7 +137,7 @@ class StackGRUDecoder(StackGRU):
 
             loss += self.criterion(output, target_entry)
             outputs.append(th.argmax(output, -1))
-        self.outputs = utils.packed_to_padded(outputs, target_seq_packed)
+        self.outputs = packed_to_padded(outputs, target_seq_packed)
         return loss
 
     def generate_from_latent(

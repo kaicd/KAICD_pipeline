@@ -5,7 +5,7 @@ import numpy as np
 import torch as th
 import pytorch_lightning as pl
 from wandb import Image
-from paccmann_chemistry.utils import *
+from paccmann_chemistry.utils import packed_sequential_data_preparation
 from paccmann_chemistry.utils.hyperparams import OPTIMIZER_FACTORY, SEARCH_FACTORY
 from paccmann_chemistry.utils.loss_functions import vae_loss_function
 from paccmann_chemistry.utils.search import *
@@ -278,10 +278,10 @@ class VAE(pl.LightningModule):
             logvars.append(o["logvar"])
             target_seqs.append(o["target_seq"])
 
-        decoder_loss = th.cat(decoder_losses)
-        mu = th.cat(mus)
-        logvar = th.cat(logvars)
-        target_seq = th.cat(target_seqs)
+        decoder_loss = th.stack(decoder_losses, dim=0)
+        mu = th.stack(mus, dim=0)
+        logvar = th.stack(logvars, dim=0)
+        target_seq = th.stack(target_seqs, dim=0)
 
         loss, kl_div = vae_loss_function(decoder_loss, mu, logvar, eval_mode=True)
         self.log("val_loss", loss)

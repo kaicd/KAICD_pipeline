@@ -2,6 +2,12 @@ import torch as th
 import torch.nn as nn
 import pytoda
 from paccmann_chemistry.models.stack_rnn import StackGRU
+from paccmann_chemistry.utils import (
+    perpare_packed_input,
+    manage_step_packed_vars,
+    unpack_sequence,
+    repack_sequence,
+)
 
 
 class StackGRUEncoder(StackGRU):
@@ -142,15 +148,15 @@ class StackGRUEncoder(StackGRU):
 
         final_hidden = hidden.detach().clone()
         final_stack = stack.detach().clone()
-        input_seq_packed, batch_sizes = utils.perpare_packed_input(input_seq)
+        input_seq_packed, batch_sizes = perpare_packed_input(input_seq)
 
         prev_batch = batch_sizes[0]
 
         for input_entry, batch_size in zip(input_seq_packed, batch_sizes):
-            final_hidden, hidden = utils.manage_step_packed_vars(
+            final_hidden, hidden = manage_step_packed_vars(
                 final_hidden, hidden, batch_size, prev_batch, batch_dim=1
             )
-            final_stack, stack = utils.manage_step_packed_vars(
+            final_stack, stack = manage_step_packed_vars(
                 final_stack, stack, batch_size, prev_batch, batch_dim=0
             )
             prev_batch = batch_size
@@ -172,25 +178,25 @@ class StackGRUEncoder(StackGRU):
             hidden_backward = self.backward_stackgru.init_hidden
             stack_backward = self.backward_stackgru.init_stack
 
-            input_seq = utils.unpack_sequence(input_seq)
+            input_seq = unpack_sequence(input_seq)
 
             for i, seq in enumerate(input_seq):
                 idx = [i for i in range(len(seq) - 1, -1, -1)]
                 idx = th.LongTensor(idx)
                 input_seq[i] = seq.index_select(0, idx)
 
-            input_seq = utils.repack_sequence(input_seq)
-            input_seq_packed, batch_sizes = utils.perpare_packed_input(input_seq)
+            input_seq = repack_sequence(input_seq)
+            input_seq_packed, batch_sizes = perpare_packed_input(input_seq)
 
             final_hidden = hidden_backward.detach().clone()
             prev_batch = batch_sizes[0]
 
             for input_entry, batch_size in zip(input_seq_packed, batch_sizes):
                 # for seq in input_seq:
-                final_hidden, hidden_backward = utils.manage_step_packed_vars(
+                final_hidden, hidden_backward = manage_step_packed_vars(
                     final_hidden, hidden_backward, batch_size, prev_batch, batch_dim=1
                 )
-                final_stack, stack_backward = utils.manage_step_packed_vars(
+                final_stack, stack_backward = manage_step_packed_vars(
                     final_stack, stack_backward, batch_size, prev_batch, batch_dim=0
                 )
                 prev_batch = batch_size
