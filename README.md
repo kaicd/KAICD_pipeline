@@ -18,12 +18,12 @@ Also, the workload required to run the full pipeline is intensive and might not 
 
 ### affinity predictor
 ```console
-(paccmann_sarscov2) $ python python PYTHONPATH='./' python ./main/pl_train_affinity.py
+(paccmann_sarscov2) $ PYTHONPATH='./' python ./main/pl_train_affinity.py
 ```
 
 ### toxicity predictor
 ```console
-(paccmann_sarscov2) $ python PYTHONPATH='./' python ./main/pl_train_toxicity.py
+(paccmann_sarscov2) $ PYTHONPATH='./' python ./main/pl_train_toxicity.py
 ```
 
 ### protein VAE
@@ -31,5 +31,5 @@ It will be implemented soon...
 
 ### SELFIES VAE
 ```console
-(paccmann_sarscov2) $ python PYTHONPATH='./' python ./main/pl_train_selfies.py
+(paccmann_sarscov2) $ PYTHONPATH='./' python ./main/pl_train_selfies.py
 ```
