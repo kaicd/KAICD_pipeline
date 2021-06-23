@@ -230,7 +230,6 @@ class VAE(pl.LightningModule):
 
     def training_step(self, batch, batch_idx, *args, **kwargs):
         opt = self.optimizers()
-        sch = self.lr_schedulers()
         encoder_seq, decoder_seq, target_seq = self.data_preparation(
             batch,
             input_keep=self.input_keep,
@@ -249,7 +248,6 @@ class VAE(pl.LightningModule):
         self.log("train_kl_div", kl_div)
         self.manual_backward(loss)
         opt.step()
-        sch.step()
 
         if batch_idx % self.eval_interval == 0:
             self.eval()
