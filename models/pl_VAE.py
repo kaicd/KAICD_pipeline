@@ -296,7 +296,7 @@ class VAE(pl.LightningModule):
                 self.logger.experiment.log(
                     {
                         "reconstructed_mol_img": [
-                            Image(mols.cpu(), caption="reconstructed_mol_img")
+                            Image(mols, caption="reconstructed_mol_img")
                         ]
                     }
                 )
