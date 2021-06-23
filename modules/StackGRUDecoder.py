@@ -5,10 +5,16 @@ from paccmann_chemistry.models.stack_rnn import StackGRU
 from paccmann_chemistry.utils import (
     perpare_packed_input,
     manage_step_packed_vars,
-    packed_to_padded
+    packed_to_padded,
 )
-from paccmann_chemistry.utils.search import SamplingSearch
+from paccmann_chemistry.utils.search import (
+    Search,
+    SamplingSearch,
+    BeamSearch,
+    GreedySearch,
+)
 from paccmann_chemistry.utils.hyperparams import OPTIMIZER_FACTORY
+
 
 class StackGRUDecoder(StackGRU):
     """Stacked GRU Decoder."""
