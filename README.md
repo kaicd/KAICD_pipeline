@@ -33,3 +33,14 @@ It will be implemented soon...
 ```console
 (paccmann_sarscov2) $ PYTHONPATH='./' python ./main/pl_train_selfies.py
 ```
+
+### SMILESDataset data to SMILES
+```console
+smiles_batch = []
+
+for data in batch:
+  mol = crop_start_stop(data, self.smiles_language)
+  mol = self.smiles_language.token_indexes_to_smiles(mol)
+  mol = self.smiles_language.selfies_to_smiles(mol) if self.selfies else mol
+  smiles_batch.append(mol)
+```
