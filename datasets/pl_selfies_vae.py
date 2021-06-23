@@ -87,7 +87,7 @@ class SELFIES_VAE_lightning(pl.LightningDataModule):
             shuffle=shuffle,
             drop_last=True,
             pin_memory=self.params.get("pin_memory", True),
-            num_workers=self.params.get("num_workers", 4),
+            num_workers=self.params.get("num_workers", 8),
         )
 
     def collate_fn(self, batch):

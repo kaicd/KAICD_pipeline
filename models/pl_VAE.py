@@ -238,16 +238,17 @@ class VAE(pl.LightningModule):
             device=self.device,
         )
 
-        self.train()
         opt.zero_grad()
         decoder_loss, mu, logvar = self(encoder_seq, decoder_seq, target_seq)
         loss, kl_div = vae_loss_function(
             decoder_loss, mu, logvar, kl_growth=self.kl_growth, step=self.global_step
         )
-        self.log("train_loss", loss)
-        self.log("train_kl_div", kl_div)
         self.manual_backward(loss)
         opt.step()
+        th.cuda.empty_cache()
+
+        self.log("train_loss", loss)
+        self.log("train_kl_div", kl_div)
 
         if batch_idx % self.eval_interval == 0:
             self.eval()
@@ -300,6 +301,8 @@ class VAE(pl.LightningModule):
                         ]
                     }
                 )
+            self.train()
+
     def validation_step(self, batch, *args, **kwargs):
         self.eval()
         encoder_seq, decoder_seq, target_seq = self.data_preparation(
