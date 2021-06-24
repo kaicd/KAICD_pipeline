@@ -1,5 +1,4 @@
 import json
-import pickle
 from itertools import takewhile
 
 import numpy as np
@@ -65,7 +64,6 @@ class VAE(pl.LightningModule):
         self.eval_interval = params["eval_interval"]
         self.epochs = params.get("epochs", 100)
         self.lr = params.get("learning_rate", 0.0005)
-        self.automatic_optimization = False
 
     def encode(self, input_seq):
         """
@@ -229,7 +227,6 @@ class VAE(pl.LightningModule):
         return decoder_loss, mu, logvar
 
     def training_step(self, batch, batch_idx, *args, **kwargs):
-        opt = self.optimizers()
         encoder_seq, decoder_seq, target_seq = self.data_preparation(
             batch,
             input_keep=self.input_keep,
@@ -238,73 +235,16 @@ class VAE(pl.LightningModule):
             device=self.device,
         )
 
-        opt.zero_grad()
         decoder_loss, mu, logvar = self(encoder_seq, decoder_seq, target_seq)
         loss, kl_div = vae_loss_function(
             decoder_loss, mu, logvar, kl_growth=self.kl_growth, step=self.global_step
         )
-        self.manual_backward(loss)
-        opt.step()
-        th.cuda.empty_cache()
-
         self.log("train_loss", loss)
         self.log("train_kl_div", kl_div)
 
-        if batch_idx % self.eval_interval == 0:
-            self.eval()
-            latent_z = th.randn(1, mu.shape[0], mu.shape[1]).to(self.device)
-            molecule_iter = self.generate(
-                latent_z,
-                prime_input=th.tensor([self.start_index]).to(self.device),
-                end_token=th.tensor([self.end_index]).to(self.device),
-                generate_len=self.generate_len,
-                search=self.search,
-            )
-            mol = next(molecule_iter)
-            mol = self.smiles_language.token_indexes_to_smiles(
-                crop_start_stop(mol, self.smiles_language)
-            )
-            mol = self.smiles_language.selfies_to_smiles(mol) if self.selfies else mol
-
-            if not mol == -1:
-                mol = Chem.MolFromSmiles(mol)
-                if mol:
-                    mol = np.array(Draw.MolsToImage([mol]))
-                    self.logger.experiment.log(
-                        {
-                            "generated_mol_img": [
-                                Image(mol, caption="generated_mol_img")
-                            ]
-                        }
-                    )
-
-            if self.batch_mode == "packed":
-                target_seq = unpack_sequence(target_seq)
-
-            target, pred = print_example_reconstruction(
-                self.decoder.outputs, target_seq, self.smiles_language, self.selfies
-            )
-
-            mol = None
-            molt = None
-            if not target == -1:
-                mol = Chem.MolFromSmiles(target)
-            if not pred == -1:
-                molt = Chem.MolFromSmiles(pred)
-
-            if mol and molt:
-                mols = np.array(Draw.MolsToImage([mol, molt]))
-                self.logger.experiment.log(
-                    {
-                        "reconstructed_mol_img": [
-                            Image(mols, caption="reconstructed_mol_img")
-                        ]
-                    }
-                )
-            self.train()
+        return loss
 
     def validation_step(self, batch, *args, **kwargs):
-        self.eval()
         encoder_seq, decoder_seq, target_seq = self.data_preparation(
             batch,
             input_keep=self.input_keep,
@@ -314,6 +254,56 @@ class VAE(pl.LightningModule):
         )
 
         decoder_loss, mu, logvar = self(encoder_seq, decoder_seq, target_seq)
+
+        latent_z = th.randn(1, mu.shape[0], mu.shape[1]).to(self.device)
+        molecule_iter = self.generate(
+            latent_z,
+            prime_input=th.tensor([self.start_index]).to(self.device),
+            end_token=th.tensor([self.end_index]).to(self.device),
+            generate_len=self.generate_len,
+            search=self.search,
+        )
+        mol = next(molecule_iter)
+        mol = self.smiles_language.token_indexes_to_smiles(
+            crop_start_stop(mol, self.smiles_language)
+        )
+        mol = self.smiles_language.selfies_to_smiles(mol) if self.selfies else mol
+
+        if not mol == -1:
+            mol = Chem.MolFromSmiles(mol)
+            if mol:
+                mol = np.array(Draw.MolsToImage([mol]))
+                self.logger.experiment.log(
+                    {
+                        "generated_mol_img": [
+                            Image(mol, caption="generated_mol_img")
+                        ]
+                    }
+                )
+
+        if self.batch_mode == "packed":
+            target_seq = unpack_sequence(target_seq)
+
+        target, pred = print_example_reconstruction(
+            self.decoder.outputs, target_seq, self.smiles_language, self.selfies
+        )
+
+        mol = None
+        molt = None
+        if not target == -1:
+            mol = Chem.MolFromSmiles(target)
+        if not pred == -1:
+            molt = Chem.MolFromSmiles(pred)
+
+        if mol and molt:
+            mols = np.array(Draw.MolsToImage([mol, molt]))
+            self.logger.experiment.log(
+                {
+                    "reconstructed_mol_img": [
+                        Image(mols, caption="reconstructed_mol_img")
+                    ]
+                }
+            )
 
         return {
             "decoder_loss": decoder_loss,

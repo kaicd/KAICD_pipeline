@@ -1,4 +1,6 @@
 import json
+import dill
+import os.path as osp
 from argparse import ArgumentParser
 import torch as th
 import pytorch_lightning as pl
@@ -41,6 +43,7 @@ class SELFIES_VAE_lightning(pl.LightningDataModule):
         **kwargs,
     ):
         super(SELFIES_VAE_lightning, self).__init__()
+        self.dataset_filepath = project_filepath + "preprocessing/"
         self.train_smiles_filepath = project_filepath + train_smiles_filepath
         self.test_smiles_filepath = project_filepath + test_smiles_filepath
         self.smiles_language_filepath = project_filepath + smiles_language_filepath
@@ -56,28 +59,45 @@ class SELFIES_VAE_lightning(pl.LightningDataModule):
     def setup(self, stage: Optional[str] = None) -> None:
         smiles_filepath = [self.test_smiles_filepath, self.test_smiles_filepath]
 
-        for i in range(2):
-            dataset = SMILESDataset(
-                smiles_filepath[i],
-                smiles_language=self.smiles_language,
-                padding=False,
-                selfies=self.params.get("selfies", False),
-                add_start_and_stop=self.params.get("add_start_stop_token", True),
-                augment=self.params.get("augment_smiles", False),
-                canonical=self.params.get("canonical", False),
-                kekulize=self.params.get("kekulize", False),
-                all_bonds_explicit=self.params.get("all_bonds_explicit", False),
-                all_hs_explicit=self.params.get("all_hs_explicit", False),
-                remove_bonddir=self.params.get("remove_bonddir", False),
-                remove_chirality=self.params.get("remove_chirality", False),
-                backend="lazy",
-                device=self.device,
-            )
+        if osp.exists(self.dataset_filepath + "train_dataset.pkl") and osp.exists(self.dataset_filepath + "test_dataset.pkl"):
+            print("Preprocessing file already exists!\nLoading...")
 
-            if i == 0:
-                self.train_dataset = dataset
-            else:
-                self.test_dataset = dataset
+            with open(self.dataset_filepath + "train_dataset.pkl", "rb") as f:
+                self.train_dataset = dill.load(f)
+            with open(self.dataset_filepath + "test_dataset.pkl", "rb") as f:
+                self.test_dataset = dill.load(f)
+            print("Done...!")
+        else:
+            print("Data preprocessing...")
+            for i in range(2):
+                dataset = SMILESDataset(
+                    smiles_filepath[i],
+                    smiles_language=self.smiles_language,
+                    padding=False,
+                    selfies=self.params.get("selfies", False),
+                    add_start_and_stop=self.params.get("add_start_stop_token", True),
+                    augment=self.params.get("augment_smiles", False),
+                    canonical=self.params.get("canonical", False),
+                    kekulize=self.params.get("kekulize", False),
+                    all_bonds_explicit=self.params.get("all_bonds_explicit", False),
+                    all_hs_explicit=self.params.get("all_hs_explicit", False),
+                    remove_bonddir=self.params.get("remove_bonddir", False),
+                    remove_chirality=self.params.get("remove_chirality", False),
+                    backend="lazy",
+                    device=self.device,
+                )
+
+                if i == 0:
+                    self.train_dataset = dataset
+                else:
+                    self.test_dataset = dataset
+
+            print("Saving...")
+            with open(self.dataset_filepath + "train_dataset.pkl", "wb") as f:
+                dill.dump(self.train_dataset, f)
+            with open(self.dataset_filepath + "test_dataset.pkl", "wb") as f:
+                dill.dump(self.test_dataset, f)
+            print("Done...!")
 
     def dataloader(self, dataset, shuffle, **kwargs):
         return DataLoader(

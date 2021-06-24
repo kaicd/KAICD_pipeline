@@ -43,7 +43,7 @@ parser.add_argument(
 
 # Trainer args
 parser = pl.Trainer.add_argparse_args(parser)
-parser.set_defaults(gpus=1, accelerator="ddp", max_epochs=200)
+parser.set_defaults(gpus=1, accelerator="ddp", max_epochs=50)
 
 # Dataset args
 parser = SELFIES_VAE_lightning.add_argparse_args(parser)
@@ -57,12 +57,12 @@ with open(args.project_filepath + args.params_filepath) as f:
 smiles_language = SMILESLanguage.load(
     args.project_filepath + args.smiles_language_filepath
 )
-params.update(
-    {
-        "vocab_size": smiles_language.number_of_tokens,
-        "pad_index": smiles_language.padding_index,
-    }
-)
+# params.update(
+#     {
+#         "vocab_size": smiles_language.number_of_tokens,
+#         "pad_index": smiles_language.padding_index,
+#     }
+# )
 vocab_dict = smiles_language.index_to_token
 params.update(
     {
