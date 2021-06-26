@@ -17,17 +17,17 @@ This is around **6GB** of data, required for pretaining multiple models.
 Also, the workload required to run the full pipeline is intensive and might not be straightforward to run all the steps on a desktop laptop.
 
 
-# PaccMann_rl generator
+# PaccMann_rl generator(Pytorch-Lightning)
 ```console
 (paccmann_sarscov2) $ PYTHONPATH='./' python ./main/pl_train_generator.py
 ```
 
-### affinity predictor
+### affinity predictor(Pytorch-Lightning)
 ```console
 (paccmann_sarscov2) $ PYTHONPATH='./' python ./main/pl_train_affinity.py
 ```
 
-### toxicity predictor
+### toxicity predictor(Pytorch-Lightning)
 ```console
 (paccmann_sarscov2) $ PYTHONPATH='./' python ./main/pl_train_toxicity.py
 ```
@@ -35,7 +35,7 @@ Also, the workload required to run the full pipeline is intensive and might not 
 ### protein VAE
 It will be implemented soon...
 
-### SELFIES VAE
+### SELFIES VAE(Pytorch-Lightning)
 ```console
 (paccmann_sarscov2) $ PYTHONPATH='./' python ./main/pl_train_selfies.py
 ```
