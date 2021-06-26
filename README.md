@@ -16,6 +16,12 @@ data
 This is around **6GB** of data, required for pretaining multiple models.
 Also, the workload required to run the full pipeline is intensive and might not be straightforward to run all the steps on a desktop laptop.
 
+
+# PaccMann_rl generator
+```console
+(paccmann_sarscov2) $ PYTHONPATH='./' python ./main/pl_train_generator.py
+```
+
 ### affinity predictor
 ```console
 (paccmann_sarscov2) $ PYTHONPATH='./' python ./main/pl_train_affinity.py
