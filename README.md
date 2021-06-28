@@ -50,3 +50,10 @@ for data in batch:
   mol = self.smiles_language.selfies_to_smiles(mol) if self.selfies else mol
   smiles_batch.append(mol)
 ```
+
+# PaccMann_rl generator(train_conditional_generator.py : Not implemented by Pytorch-Lightning)
+```console
+(paccmann_sarscov2) $ for protein_id in (seq 40)
+  python ./main/train_conditional_generator.py /raid/paccmann-covid/models/SELFIESVAE /raid/paccmann-covid/models/ProteinVAE /raid/paccmann-covid/models/affinity /raid/paccmann-covid/data/training/merged_sequence_encoding/uniprot_covid-19.csv /raid/paccmann-covid/conditional_generator.json paccmann_sarscov2 $protein_id /raid/paccmann-covid/data/training/unbiased_predictions --tox21_path /raid/paccmann-covid//models/Tox21
+  end
+```
