@@ -1,9 +1,11 @@
 import argparse
 import json
+import pickle
 import os
 import sys
 import logging
 
+import torch
 import numpy as np
 import pandas as pd
 from PIL import Image as pilimg
@@ -157,21 +159,21 @@ class Reinforce_lightning(pl.LightningModule):
             mol_params = json.load(f)
         encoder = StackGRUEncoder(mol_params)
         decoder = StackGRUDecoder(mol_params)
-        self.generator = TeacherVAE(encoder, decoder)
-        self.generator.load(
+        generator = TeacherVAE(encoder, decoder)
+        generator.load(
             os.path.join(
                 project_path + mol_model_path,
                 f"weights/best_{self.params.get('metric', 'rec')}.pt",
             ),
             map_location=get_device(),
         )
-        self.generator.encoder.eval()
+        generator.encoder.eval()
 
         # Load smiles languages for generator
         generator_smiles_language = SMILESLanguage.load(
             os.path.join(project_path + mol_model_path, "selfies_language.pkl")
         )
-        self.generator._associate_language(generator_smiles_language)
+        generator._associate_language(generator_smiles_language)
 
         # Restore protein model
         with open(
@@ -230,7 +232,7 @@ class Reinforce_lightning(pl.LightningModule):
         # Define reinforcement learning model
         model_folder_name = model_name
         self.learner = ReinforceProtein(
-            self.generator,
+            generator,
             protein_encoder,
             predictor,
             protein_df,
@@ -254,15 +256,18 @@ class Reinforce_lightning(pl.LightningModule):
     def training_step(self, batch, *args, **kwargs):
         rew, loss = self(batch[0])
 
-        self.log("mean_reward", rew.item())
+        self.log("mean_rewards", rew)
         self.log("rl_loss", loss)
 
         return {"mean_rewards": rew, "rl_loss": loss}
 
     def training_epoch_end(self, outputs):
         for o in outputs:
-            self.rewards.append(o["mean_rewards"].item())
+            self.rewards.append(o["mean_rewards"])
             self.rl_losses.append(o["rl_loss"])
+
+        with open("/home/lhs/test.pickle", "wb") as f:
+            pickle.dump(outputs, f)
 
         if self.current_epoch % self.save_interval == 0:
             self.learner.save(f"gen_{self.current_epoch}.pt", f"enc_{self.current_epoch}.pt")
@@ -339,10 +344,10 @@ class Reinforce_lightning(pl.LightningModule):
 
     def configure_optimizers(self):
         opt = Adam(
-            self.generator.decoder.parameters(),
+            self.learner.generator.decoder.parameters(),
             lr=self.params.get("learning_rate", 0.0001),
             eps=self.params.get("eps", 0.0001),
             weight_decay=self.params.get("weight_decay", 0.00001),
         )
 
-        return [opt]
+        return opt

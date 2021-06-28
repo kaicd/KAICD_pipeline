@@ -12,7 +12,6 @@ parser = argparse.ArgumentParser()
 # Project args
 parser.add_argument("--entity", type=str, default="kaicd")
 parser.add_argument("--project", type=str, default="PaccMann_rl_sarscov2")
-parser.add_argument("--seed", type=int, default=42)
 parser.add_argument(
     "--project_path",
     type=str,
@@ -40,7 +39,6 @@ parser.set_defaults(gpus=1, accelerator="ddp", max_epochs=100)
 parser = Reinforce_lightning.add_model_args(parser)
 
 args, _ = parser.parse_known_args()
-pl.seed_everything(args.seed)
 
 # Define model and dataset
 net = Reinforce_lightning(**vars(args))
