@@ -59,7 +59,7 @@ for data in batch:
   /raid/paccmann-covid/models/ProteinVAE \
   /raid/paccmann-covid/models/affinity \
   /raid/paccmann-covid/data/training/merged_sequence_encoding/uniprot_covid-19.csv \
-  /raid/paccmann-covid/conditional_generator.json paccmann_sarscov2 $protein_id \
+  /raid/paccmann-covid/params/conditional_generator.json paccmann_sarscov2 $protein_id \
   /raid/paccmann-covid/data/training/unbiased_predictions --tox21_path \
   /raid/paccmann-covid/models/Tox21
   end
