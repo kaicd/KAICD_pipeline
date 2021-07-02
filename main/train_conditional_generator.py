@@ -12,7 +12,7 @@ from rdkit import Chem
 from rdkit.Chem import Draw
 from paccmann_omics.encoders import ENCODER_FACTORY
 
-from paccmann_chemistry.models import StackGRUDecoder, StackGRUEncoder, TeacherVAE
+from paccmann_chemistry.models import StackGRUEncoder, StackGRUDecoder, TeacherVAE
 from paccmann_chemistry.utils import get_device
 from paccmann_generator import ReinforceProtein
 from paccmann_generator.plot_utils import plot_and_compare_proteins, plot_loss
@@ -21,6 +21,7 @@ from paccmann_predictor.models import MODEL_FACTORY
 from pytoda.files import read_smi
 from pytoda.proteins.protein_language import ProteinLanguage
 from pytoda.smiles.smiles_language import SMILESLanguage
+
 
 # setup logging
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
@@ -127,11 +128,13 @@ def main(*, parser_namespace):
 
     protein_test_name = protein_df.iloc[test_id].name
     logger.info(f"Test protein is {protein_test_name}")
+
+    version = "(fixed)"
     wandb.init(
         entity="kaicd",
-        project="PaccMann_rl_sarscov2",
-        name=protein_test_name + "(base)",
-        group=protein_df.iloc[test_id]["organism_name"],
+        project="PaccMann^RL_sarscov2",
+        name=protein_test_name + version,
+        group=protein_df.iloc[test_id]["organism_name"] + version,
     )
 
     # Restore SMILES Model
@@ -230,9 +233,11 @@ def main(*, parser_namespace):
         logger,
     )
 
+    global_step = 0
     biased_ratios, tox_ratios = [], []
     rewards, rl_losses = [], []
-    gen_mols, gen_prot, gen_affinity, mode = [], [], [], []
+    gen_mols, gen_prot, gen_affinity, mode, toxes = [], [], [], [], []
+    non_toxic_useful_smiles, non_toxic_useful_preds = [], []
 
     logger.info(f"Model stored at {learner.model_path}")
 
@@ -254,14 +259,12 @@ def main(*, parser_namespace):
                 f"{len(train_protein_df):d}\t loss={loss:.2f}, mean rew={rew:.2f}"
             )
 
-            wandb.log({"rl_loss": loss})
-            wandb.log({"rewards": rew})
+            wandb.log({"rl_loss": loss, "global_step": global_step})
+            wandb.log({"rewards": rew, "global_step": global_step})
             rewards.append(rew)
             rl_losses.append(loss)
+            global_step += 1
 
-        # Save model
-        if epoch % 10 == 0:
-            learner.save(f"gen_{epoch}.pt", f"enc_{epoch}.pt")
         logger.info(f"EVAL protein: {protein_test_name}")
 
         smiles, preds = learner.generate_compounds_and_evaluate(
@@ -275,6 +278,12 @@ def main(*, parser_namespace):
             gen_prot.append(protein_test_name)
             gen_affinity.append(p)
             mode.append("eval")
+
+            tox = learner.tox21(s)
+            toxes.append(tox)
+            if tox == 1.0:
+                non_toxic_useful_smiles.append(s)
+                non_toxic_useful_preds.append(p)
 
         plot_and_compare_proteins(
             unbiased_preds,
@@ -291,12 +300,11 @@ def main(*, parser_namespace):
         all_toxes = np.array([learner.tox21(s) for s in smiles])
         tox_ratio = np.round(100 * (np.sum(all_toxes == 1.0) / len(all_toxes)), 1)
         tox_ratios.append(tox_ratio)
-        toxes = [learner.tox21(s) for s in gen_mols]
 
         logger.info(f"Percentage of non-toxic compounds {tox_ratios[-1]}")
 
-        wandb.log({"efficacy_ratio": biased_ratio})
-        wandb.log({"tox_ratio": tox_ratio})
+        wandb.log({"efficacy_ratio": biased_ratio, "epoch": epoch})
+        wandb.log({"tox_ratio": tox_ratio, "epoch": epoch})
         img = os.path.join(
             learner.model_path,
             f"results/train_{protein_test_name}_epoch_{epoch}_eff_{biased_ratio}.png",
@@ -305,54 +313,61 @@ def main(*, parser_namespace):
             {"NAIVE and BIASED binding compounds distribution": [wandb.Image(img)]}
         )
 
-        # Filtering (tox == 1.0 -> non-toxic)
-        non_toxic_useful_smiles = [s for i, s in enumerate(gen_mols) if toxes[i] == 1.0]
-
-        # Log top 5 generate molecule
+        # Log top 4 generate molecule
+        idx = np.argsort(non_toxic_useful_preds)[::-1]
         lead = []
-        for smiles in non_toxic_useful_smiles:
-            mol = Chem.MolFromSmiles(smiles)
+        captions = []
+        for i in idx:
+            mol = Chem.MolFromSmiles(non_toxic_useful_smiles[i])
             if mol:
                 lead.append(mol)
-                if len(lead) == 5:
+                captions.append(str(non_toxic_useful_preds[i]))
+                if len(lead) == 4:
                     break
 
         if len(lead) > 0:
             wandb.log(
                 {
                     "Top N Generative Molecules": [
-                        wandb.Image(Draw.MolsToImage(lead), caption="Good Molecules")
+                        wandb.Image(generate_mols_img(lead, legends=captions))
                     ]
                 }
             )
 
-        # Save results (good molecules!) in DF
-        df = pd.DataFrame(
-            {
-                "protein": gen_prot,
-                "SMILES": gen_mols,
-                "Binding probability": gen_affinity,
-                "mode": mode,
-                "Tox21": toxes,
-            }
-        )
-        df.to_csv(os.path.join(learner.model_path, "results", "generated.csv"))
-        wandb.log({"Results": wandb.Table(dataframe=df)})
-
-        # Plot loss development
-        loss_df = pd.DataFrame({"loss": rl_losses, "rewards": rewards})
-        loss_df.to_csv(learner.model_path + "/results/loss_reward_evolution.csv")
-        plot_loss(
-            rl_losses,
-            rewards,
-            params["epochs"],
-            protein_name,
-            learner.model_path,
-            rolling=5,
-        )
-    pd.DataFrame({"efficacy_ratio": biased_ratios, "tox_ratio": tox_ratios}).to_csv(
-        learner.model_path + "/results/ratios.csv"
+    df = pd.DataFrame(
+        {
+            "protein": gen_prot,
+            "SMILES": gen_mols,
+            "Binding probability": gen_affinity,
+            "mode": mode,
+            "Tox21": toxes,
+        }
     )
+    df.to_csv(os.path.join(learner.model_path, "results", "generated.csv"))
+    wandb.log({"Results": wandb.Table(dataframe=df)})
+
+    learner.save(f"gen_{params['epochs']}.pt", f"enc_{params['epochs']}.pt")
+
+
+def generate_mols_img(mols, sub_img_size=(512, 512), legends=None, row=2, **kwargs):
+    if legends is None:
+        legends = [None] * len(mols)
+    res = pilimg.new(
+        "RGBA",
+        (
+            sub_img_size[0] * row,
+            sub_img_size[1] * (len(mols) // row)
+            if len(mols) % row == 0
+            else sub_img_size[1] * ((len(mols) // row) + 1),
+        ),
+    )
+    for i, mol in enumerate(mols):
+        res.paste(
+            Draw.MolToImage(mol, sub_img_size, legend=legends[i], **kwargs),
+            ((i // row) * sub_img_size[0], (i % row) * sub_img_size[1]),
+        )
+
+    return res
 
 
 if __name__ == "__main__":
