@@ -51,7 +51,7 @@ pl.seed_everything(args.seed)
 
 # Parameter update
 params = {}
-with open(args.project_filepath + args.params_filepath) as f:
+with open(args.params_filepath) as f:
     params.update(json.load(f))
 if params["embedding"] == "pretrained":
     params.update({"embedding_path": args.project_filepath + args.embedding_path})

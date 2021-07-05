@@ -91,7 +91,7 @@ class MCA_lightning(pl.LightningModule):
         ```
         """
         super(MCA_lightning, self).__init__()
-        self.params_filepath = project_filepath + params_filepath
+        self.params_filepath = params_filepath
 
         # Model Parameter
         params = {}

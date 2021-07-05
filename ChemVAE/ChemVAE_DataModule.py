@@ -46,7 +46,7 @@ class SELFIES_VAE_lightning(pl.LightningDataModule):
         self.train_smiles_filepath = project_filepath + train_smiles_filepath
         self.test_smiles_filepath = project_filepath + test_smiles_filepath
         self.smiles_language_filepath = project_filepath + smiles_language_filepath
-        self.params_filepath = project_filepath + params_filepath
+        self.params_filepath = params_filepath
         self.smiles_language = SMILESLanguage.load(self.smiles_language_filepath)
         self.params = {}
         self.device = device

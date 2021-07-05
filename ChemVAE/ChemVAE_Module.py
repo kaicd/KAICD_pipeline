@@ -33,7 +33,7 @@ class ChemVAE(pl.LightningModule):
             decoder (StackGRUDecoder): the decoder object.
         """
         super(ChemVAE, self).__init__()
-        self.params_filepath = project_filepath + params_filepath
+        self.params_filepath = params_filepath
         self.smiles_language_filepath = project_filepath + smiles_language_filepath
 
         # Model Parameter

@@ -29,7 +29,7 @@ class ProtVAE(pl.LightningModule):
                 latent space.
         """
         super(ProtVAE, self).__init__()
-        self.params_filepath = project_filepath + params_filepath
+        self.params_filepath = params_filepath
 
         # Model Parameter
         params = {}

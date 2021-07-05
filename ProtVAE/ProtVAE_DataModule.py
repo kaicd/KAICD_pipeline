@@ -43,7 +43,7 @@ class Protein_VAE_lightning(pl.LightningDataModule):
         self.dataset_filepath = project_filepath + "preprocessing/"
         self.train_filepath = project_filepath + train_filepath
         self.test_filepath = project_filepath + test_filepath
-        self.params_filepath = project_filepath + params_filepath
+        self.params_filepath = params_filepath
         self.params = {}
 
         # Process parameter file

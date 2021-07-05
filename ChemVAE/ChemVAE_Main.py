@@ -37,7 +37,7 @@ parser.add_argument(
 parser.add_argument(
     "--params_filepath",
     type=str,
-    default="utils/selfies.json",
+    default="Config/selfies.json",
     help="Path to the parameter file.",
 )
 
@@ -52,7 +52,7 @@ pl.seed_everything(args.seed)
 
 # Parameter update
 params = {}
-with open(args.project_filepath + args.params_filepath) as f:
+with open(args.params_filepath) as f:
     params.update(json.load(f))
 smiles_language = SMILESLanguage.load(
     args.project_filepath + args.smiles_language_filepath

@@ -27,7 +27,7 @@ parser.add_argument("--seed", type=int, default=42)
 parser.add_argument(
     "--params_filepath",
     type=str,
-    default="utils/omics.json",
+    default="Config/omics.json",
     help="Path to the parameter file.",
 )
 
