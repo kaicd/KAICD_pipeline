@@ -1,30 +1,28 @@
 import json
 from itertools import takewhile
 
-import numpy as np
 import torch as th
 import pytorch_lightning as pl
-import wandb
 from wandb import Image
-from paccmann_chemistry.utils import (
+from rdkit import Chem
+from rdkit.Chem import Draw
+from pytoda.smiles.smiles_language import SMILESLanguage
+
+from Utility.hyperparams import OPTIMIZER_FACTORY, SEARCH_FACTORY
+from Utility.loss_functions import vae_loss_function
+from Utility.search import *
+from Utility.utils import (
     packed_sequential_data_preparation,
     sequential_data_preparation,
     unpack_sequence,
     print_example_reconstruction,
     crop_start_stop,
 )
-from paccmann_chemistry.utils.hyperparams import OPTIMIZER_FACTORY, SEARCH_FACTORY
-from paccmann_chemistry.utils.loss_functions import vae_loss_function
-from paccmann_chemistry.utils.search import *
-from pytoda.smiles.smiles_language import SMILESLanguage
-from rdkit import Chem
-from rdkit.Chem import Draw
-
-from modules.StackGRUEncoder import StackGRUEncoder
-from modules.StackGRUDecoder import StackGRUDecoder
+from StackGRUEncoder import StackGRUEncoder
+from StackGRUDecoder import StackGRUDecoder
 
 
-class VAE(pl.LightningModule):
+class ChemVAE(pl.LightningModule):
     def __init__(
         self, project_filepath, params_filepath, smiles_language_filepath, **kwargs
     ):
@@ -34,7 +32,7 @@ class VAE(pl.LightningModule):
             encoder (StackGRUEncoder): the encoder object.
             decoder (StackGRUDecoder): the decoder object.
         """
-        super(VAE, self).__init__()
+        super(ChemVAE, self).__init__()
         self.params_filepath = project_filepath + params_filepath
         self.smiles_language_filepath = project_filepath + smiles_language_filepath
 
@@ -54,7 +52,7 @@ class VAE(pl.LightningModule):
             beam_width=params.get("beam_width", 3),
             top_tokens=params.get("top_tokens", 5),
         )  # yapf: disable
-        self.opt_fn = OPTIMIZER_FACTORY[params.get("optimizer", "adadelta")]
+        self.opt_fn = OPTIMIZER_FACTORY[params.get("optimizer", "Adadelta")]
         self.lr = params["learning_rate"]
         self.kl_growth = params["kl_growth"]
         self.input_keep = params["input_keep"]
@@ -64,6 +62,158 @@ class VAE(pl.LightningModule):
         self.eval_interval = params["eval_interval"]
         self.epochs = params.get("epochs", 100)
         self.lr = params.get("learning_rate", 0.0005)
+
+    def forward(self, input_seq, decoder_seq, target_seq):
+        """
+        The Forward Function.
+        Args:
+            input_seq (torch.Tensor): the sequence of indices for the input
+                of shape `[max batch sequence length +1, batch_size]`, where +1
+                is for the added start_index.
+            target_seq (torch.Tensor): the sequence of indices for the
+                target of shape `[max batch sequence length +1, batch_size]`,
+                where +1 is for the added end_index.
+        Note: Input and target sequences are outputs of
+            sequential_data_preparation(batch) with batches returned by a
+            DataLoader object.
+        Returns:
+            (torch.Tensor, torch.Tensor, torch.Tensor): decoder_loss, mu,
+                logvar
+            decoder_loss is the cross-entropy training loss for the decoder.
+            mu is the latent mean of shape `[1, batch_size, latent_dim]`.
+            logvar is log of the latent variance of shape
+                `[1, batch_size, latent_dim]`.
+        """
+        mu, logvar = self.encode(input_seq)
+        latent_z = self.reparameterize(mu, logvar).unsqueeze(0)
+        decoder_loss = self.decode(latent_z, decoder_seq, target_seq)
+
+        return decoder_loss, mu, logvar
+
+    def shared_step(self, batch, *args, **kwargs):
+        encoder_seq, decoder_seq, target_seq = self.data_preparation(
+            batch,
+            input_keep=self.input_keep,
+            start_index=self.start_index,
+            end_index=self.end_index,
+        )
+        decoder_loss, mu, logvar = self(encoder_seq, decoder_seq, target_seq)
+
+        return decoder_loss, mu, logvar, target_seq
+
+    def training_step(self, batch, batch_idx, *args, **kwargs):
+        decoder_loss, mu, logvar, _ = self.shared_step(batch)
+        loss, kl_div = vae_loss_function(
+            decoder_loss, mu, logvar, kl_growth=self.kl_growth, step=self.global_step
+        )
+        self.log("train_loss", loss)
+        self.log("train_kl_div", kl_div)
+
+        return loss
+
+    def validation_step(self, batch, *args, **kwargs):
+        decoder_loss, mu, logvar, target_seq = self.shared_step(batch)
+        # latent_z = th.randn(1, mu.shape[0], mu.shape[1]).to(self.device)
+        # molecule_iter = self.generate(
+        #     latent_z,
+        #     prime_input=th.tensor([self.start_index]).to(self.device),
+        #     end_token=th.tensor([self.end_index]).to(self.device),
+        #     generate_len=self.generate_len,
+        #     search=self.search,
+        # )
+        # mol = next(molecule_iter)
+        # mol = self.smiles_language.token_indexes_to_smiles(
+        #     crop_start_stop(mol, self.smiles_language)
+        # )
+        # mol = self.smiles_language.selfies_to_smiles(mol) if self.selfies else mol
+        #
+        # if not mol == -1:
+        #     mol = Chem.MolFromSmiles(mol)
+        #     if mol:
+        #         mol = np.array(Draw.MolsToImage([mol]))
+        #         self.logger.experiment.log(
+        #             {"generated_mol_img": [Image(mol, caption="generated_mol_img")]}
+        #         )
+        #
+        # if self.batch_mode == "packed":
+        #     target_seq = unpack_sequence(target_seq)
+        #
+        # target, pred = print_example_reconstruction(
+        #     self.decoder.outputs, target_seq, self.smiles_language, self.selfies
+        # )
+        #
+        # mol = None
+        # molt = None
+        # if not target == -1:
+        #     mol = Chem.MolFromSmiles(target)
+        # if not pred == -1:
+        #     molt = Chem.MolFromSmiles(pred)
+        #
+        # if mol and molt:
+        #     mols = np.array(Draw.MolsToImage([mol, molt]))
+        #     self.logger.experiment.log(
+        #         {
+        #             "reconstructed_mol_img": [
+        #                 Image(mols, caption="reconstructed_mol_img")
+        #             ]
+        #         }
+        #     )
+
+        return {
+            "decoder_loss": decoder_loss,
+            "mu": mu,
+            "logvar": logvar,
+            "target_seq": target_seq,
+        }
+
+    def validation_epoch_end(self, outputs):
+        losses = []
+        kl_divs = []
+
+        for o in outputs:
+            loss, kl_div = vae_loss_function(
+                o["decoder_loss"], o["mu"], o["logvar"], eval_mode=True
+            )
+            losses.append(loss)
+            kl_divs.append(kl_div)
+
+        loss = th.mean(th.Tensor(losses).to(self.device))
+        kl_div = th.mean(th.Tensor(kl_divs).to(self.device))
+        self.log("val_loss", loss)
+        self.log("val_kl_div", kl_div)
+
+    def configure_optimizers(self):
+        opt = self.opt_fn(self.parameters(), lr=self.lr)
+        sched = {
+            "scheduler": th.optim.lr_scheduler.LambdaLR(
+                opt,
+                lr_lambda=lambda epoch: max(1e-7, 1 - epoch / self.epochs),
+            ),
+            "reduce_on_plateau": False,
+            "interval": "epoch",
+            "frequency": 1,
+        }
+
+        return [opt], [sched]
+
+    def _associate_language(self, language):
+        """
+        Bind a SMILES language object to the model.
+        Arguments:
+            language  [pytoda.smiles.smiles_language.SMILESLanguage] --
+                A SMILES language object either supporting SMILES or SELFIES
+        Raises:
+            TypeError:
+        """
+        if isinstance(language, SMILESLanguage):
+            self.smiles_language = language
+
+        else:
+            raise TypeError(
+                "Please insert a smiles language (object of type "
+                "pytoda.smiles.smiles_language.SMILESLanguage . Given was "
+                f"{type(language)}"
+            )
 
     def encode(self, input_seq):
         """
@@ -127,7 +277,7 @@ class VAE(pl.LightningModule):
         prime_input,
         end_token,
         generate_len=100,
-        search=SamplingSearch(),
+        search=SamplingSearch,
     ):
         """
         Generate SMILES From Latent Z.
@@ -151,6 +301,7 @@ class VAE(pl.LightningModule):
                 `[sequence length]`.
         Note: The start and end tokens are automatically stripped
             from the returned torch tensors for the generated molecule.
+            :param search:
         """
         generated_batch = self.decoder.generate_from_latent(
             latent_z, prime_input, end_token, search=search, generate_len=generate_len
@@ -166,18 +317,23 @@ class VAE(pl.LightningModule):
 
         return molecule_iter
 
-    def _prepare_packed(self, batch, input_keep, start_index, end_index, device):
+    def _prepare_packed(self, batch, input_keep, start_index, end_index):
         encoder_seq, decoder_seq, target_seq = packed_sequential_data_preparation(
-            batch, input_keep=input_keep, start_index=start_index, end_index=end_index
+            batch,
+            self.device,
+            input_keep=input_keep,
+            start_index=start_index,
+            end_index=end_index,
         )
 
         return encoder_seq, decoder_seq, target_seq
 
-    def _prepare_padded(self, batch, input_keep, start_index, end_index, device):
+    def _prepare_padded(self, batch, input_keep, start_index, end_index):
         padded_batch = th.nn.utils.rnn.pad_sequence(batch)
-        padded_batch = padded_batch.to(device)
+        padded_batch = padded_batch.to(self.device)
         encoder_seq, decoder_seq, target_seq = sequential_data_preparation(
             padded_batch,
+            self.device,
             input_keep=input_keep,
             start_index=start_index,
             end_index=end_index,
@@ -199,164 +355,3 @@ class VAE(pl.LightningModule):
                 f"Unknown mode: {mode}. Available modes: {MODES.keys()}"
             )
         return MODES[mode]
-
-    def forward(self, input_seq, decoder_seq, target_seq):
-        """
-        The Forward Function.
-        Args:
-            input_seq (torch.Tensor): the sequence of indices for the input
-                of shape `[max batch sequence length +1, batch_size]`, where +1
-                is for the added start_index.
-            target_seq (torch.Tensor): the sequence of indices for the
-                target of shape `[max batch sequence length +1, batch_size]`,
-                where +1 is for the added end_index.
-        Note: Input and target sequences are outputs of
-            sequential_data_preparation(batch) with batches returned by a
-            DataLoader object.
-        Returns:
-            (torch.Tensor, torch.Tensor, torch.Tensor): decoder_loss, mu,
-                logvar
-            decoder_loss is the cross-entropy training loss for the decoder.
-            mu is the latent mean of shape `[1, batch_size, latent_dim]`.
-            logvar is log of the latent variance of shape
-                `[1, batch_size, latent_dim]`.
-        """
-        mu, logvar = self.encode(input_seq)
-        latent_z = self.reparameterize(mu, logvar).unsqueeze(0)
-        decoder_loss = self.decode(latent_z, decoder_seq, target_seq)
-        return decoder_loss, mu, logvar
-
-    def training_step(self, batch, batch_idx, *args, **kwargs):
-        encoder_seq, decoder_seq, target_seq = self.data_preparation(
-            batch,
-            input_keep=self.input_keep,
-            start_index=self.start_index,
-            end_index=self.end_index,
-            device=self.device,
-        )
-
-        decoder_loss, mu, logvar = self(encoder_seq, decoder_seq, target_seq)
-        loss, kl_div = vae_loss_function(
-            decoder_loss, mu, logvar, kl_growth=self.kl_growth, step=self.global_step
-        )
-        self.log("train_loss", loss)
-        self.log("train_kl_div", kl_div)
-
-        return loss
-
-    def validation_step(self, batch, *args, **kwargs):
-        encoder_seq, decoder_seq, target_seq = self.data_preparation(
-            batch,
-            input_keep=self.input_keep,
-            start_index=self.start_index,
-            end_index=self.end_index,
-            device=self.device,
-        )
-
-        decoder_loss, mu, logvar = self(encoder_seq, decoder_seq, target_seq)
-
-        latent_z = th.randn(1, mu.shape[0], mu.shape[1]).to(self.device)
-        molecule_iter = self.generate(
-            latent_z,
-            prime_input=th.tensor([self.start_index]).to(self.device),
-            end_token=th.tensor([self.end_index]).to(self.device),
-            generate_len=self.generate_len,
-            search=self.search,
-        )
-        mol = next(molecule_iter)
-        mol = self.smiles_language.token_indexes_to_smiles(
-            crop_start_stop(mol, self.smiles_language)
-        )
-        mol = self.smiles_language.selfies_to_smiles(mol) if self.selfies else mol
-
-        if not mol == -1:
-            mol = Chem.MolFromSmiles(mol)
-            if mol:
-                mol = np.array(Draw.MolsToImage([mol]))
-                self.logger.experiment.log(
-                    {
-                        "generated_mol_img": [
-                            Image(mol, caption="generated_mol_img")
-                        ]
-                    }
-                )
-
-        if self.batch_mode == "packed":
-            target_seq = unpack_sequence(target_seq)
-
-        target, pred = print_example_reconstruction(
-            self.decoder.outputs, target_seq, self.smiles_language, self.selfies
-        )
-
-        mol = None
-        molt = None
-        if not target == -1:
-            mol = Chem.MolFromSmiles(target)
-        if not pred == -1:
-            molt = Chem.MolFromSmiles(pred)
-
-        if mol and molt:
-            mols = np.array(Draw.MolsToImage([mol, molt]))
-            self.logger.experiment.log(
-                {
-                    "reconstructed_mol_img": [
-                        Image(mols, caption="reconstructed_mol_img")
-                    ]
-                }
-            )
-
-        return {
-            "decoder_loss": decoder_loss,
-            "mu": mu,
-            "logvar": logvar,
-            "target_seq": target_seq,
-        }
-
-    def validation_epoch_end(self, outputs):
-        losses = []
-        kl_divs = []
-
-        for o in outputs:
-            loss, kl_div = vae_loss_function(
-                o["decoder_loss"], o["mu"], o["logvar"], eval_mode=True
-            )
-            losses.append(loss)
-            kl_divs.append(kl_div)
-
-        loss = th.mean(th.Tensor(losses).to(self.device))
-        kl_div = th.mean(th.Tensor(kl_divs).to(self.device))
-        self.log("val_loss", loss)
-        self.log("val_kl_div", kl_div)
-
-    def configure_optimizers(self):
-        opt = self.opt_fn(self.parameters(), lr=self.lr)
-        sched = {
-            "scheduler": th.optim.lr_scheduler.LambdaLR(
-                opt,
-                lr_lambda=lambda epoch: max(1e-7, 1 - epoch / self.epochs),
-            ),
-            "reduce_on_plateau": False,
-            "interval": "epoch",
-            "frequency": 1,
-        }
-
-        return [opt], [sched]
-
-    def _associate_language(self, language):
-        """
-        Bind a SMILES language object to the model.
-        Arguments:
-            language  [pytoda.smiles.smiles_language.SMILESLanguage] --
-                A SMILES language object either supporting SMILES or SELFIES
-        Raises:
-            TypeError:
-        """
-        if isinstance(language, pytoda.smiles.smiles_language.SMILESLanguage):
-            self.smiles_language = language
-
-        else:
-            raise TypeError(
-                "Please insert a smiles language (object of type "
-                "pytoda.smiles.smiles_language.SMILESLanguage . Given was "
-                f"{type(language)}"
-            )

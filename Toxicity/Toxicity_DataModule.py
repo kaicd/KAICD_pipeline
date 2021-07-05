@@ -1,6 +1,6 @@
 import json
 from argparse import ArgumentParser
-import torch as th
+
 import pytorch_lightning as pl
 from typing import Optional, Union, Dict, List
 from pytoda.datasets import AnnotatedDataset, SMILESDataset

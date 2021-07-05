@@ -2,7 +2,6 @@ import json
 import dill
 import os.path as osp
 from argparse import ArgumentParser
-import torch as th
 import pytorch_lightning as pl
 from typing import Optional, Union, Dict, List
 from pytoda.datasets import SMILESDataset
@@ -59,12 +58,14 @@ class SELFIES_VAE_lightning(pl.LightningDataModule):
     def setup(self, stage: Optional[str] = None) -> None:
         smiles_filepath = [self.test_smiles_filepath, self.test_smiles_filepath]
 
-        if osp.exists(self.dataset_filepath + "train_dataset.pkl") and osp.exists(self.dataset_filepath + "test_dataset.pkl"):
+        if osp.exists(
+            self.dataset_filepath + "ChemVAE_train_dataset.pkl"
+        ) and osp.exists(self.dataset_filepath + "ChemVAE_test_dataset.pkl"):
             print("Preprocessing file already exists!\nLoading...")
 
-            with open(self.dataset_filepath + "train_dataset.pkl", "rb") as f:
+            with open(self.dataset_filepath + "ChemVAE_train_dataset.pkl", "rb") as f:
                 self.train_dataset = dill.load(f)
-            with open(self.dataset_filepath + "test_dataset.pkl", "rb") as f:
+            with open(self.dataset_filepath + "ChemVAE_test_dataset.pkl", "rb") as f:
                 self.test_dataset = dill.load(f)
             print("Done...!")
         else:
@@ -86,16 +87,15 @@ class SELFIES_VAE_lightning(pl.LightningDataModule):
                     backend="lazy",
                     device=self.device,
                 )
-
                 if i == 0:
                     self.train_dataset = dataset
                 else:
                     self.test_dataset = dataset
 
             print("Saving...")
-            with open(self.dataset_filepath + "train_dataset.pkl", "wb") as f:
+            with open(self.dataset_filepath + "ChemVAE_train_dataset.pkl", "wb") as f:
                 dill.dump(self.train_dataset, f)
-            with open(self.dataset_filepath + "test_dataset.pkl", "wb") as f:
+            with open(self.dataset_filepath + "ChemVAE_test_dataset.pkl", "wb") as f:
                 dill.dump(self.test_dataset, f)
             print("Done...!")
 
@@ -120,11 +120,10 @@ class SELFIES_VAE_lightning(pl.LightningDataModule):
             Sorted batch from longest to shortest.
         """
         return [
-            batch[index] for index in map(
+            batch[index]
+            for index in map(
                 lambda t: t[0],
-                sorted(
-                    enumerate(batch), key=lambda t: t[1].shape[0], reverse=True
-                )
+                sorted(enumerate(batch), key=lambda t: t[1].shape[0], reverse=True),
             )
         ]
 
@@ -134,4 +133,4 @@ class SELFIES_VAE_lightning(pl.LightningDataModule):
         return self.dataloader(self.train_dataset, shuffle=True)
 
     def val_dataloader(self) -> Union[DataLoader, List[DataLoader]]:
-        return self.dataloader(self.test_dataset, shuffle=False)
+        return self.dataloader(self.test_dataset, shuffle=True)

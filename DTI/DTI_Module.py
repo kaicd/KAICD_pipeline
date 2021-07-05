@@ -1,5 +1,6 @@
 import json
 from collections import OrderedDict
+
 import pytoda
 from pytoda.smiles.transforms import AugmentTensor
 import torch as th
@@ -11,16 +12,17 @@ from sklearn.metrics import (
     precision_recall_curve,
     roc_curve,
 )
-from paccmann_predictor.utils.hyperparams import (
+
+from Utility.hyperparams import (
     ACTIVATION_FN_FACTORY,
     LOSS_FN_FACTORY,
     OPTIMIZER_FACTORY,
 )
-from paccmann_predictor.utils.interpret import (
+from Utility.interpret import (
     monte_carlo_dropout,
     test_time_augmentation,
 )
-from paccmann_predictor.utils.layers import (
+from Utility.layers import (
     ContextAttentionLayer,
     convolutional_layer,
     dense_layer,
@@ -108,7 +110,7 @@ class BimodalMCA_lightning(pl.LightningModule):
         self.loss_fn = LOSS_FN_FACTORY[
             params.get("loss_fn", "binary_cross_entropy")
         ]  # yapf: disable
-        self.opt_fn = OPTIMIZER_FACTORY[params.get("optimizer", "adam")]
+        self.opt_fn = OPTIMIZER_FACTORY[params.get("optimizer", "Adam")]
         # Hyperparameter
         self.act_fn = ACTIVATION_FN_FACTORY[
             params.get("activation_fn", "relu")

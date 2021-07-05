@@ -6,8 +6,8 @@ from pytorch_lightning import loggers
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytoda.smiles.smiles_language import SMILESLanguage
 
-from models.pl_VAE import VAE
-from datasets.pl_selfies_vae import SELFIES_VAE_lightning
+from ChemVAE_Module import ChemVAE
+from ChemVAE_DataModule import SELFIES_VAE_lightning
 
 parser = argparse.ArgumentParser()
 
@@ -80,20 +80,20 @@ with open(args.project_filepath + args.params_filepath, "w") as f:
     json.dump(params, f)
 
 # Define dataset and model
-net = VAE(**vars(args))
+net = ChemVAE(**vars(args))
 data = SELFIES_VAE_lightning(device=net.device, **vars(args))
 
 # Define pytorch-lightning Trainer multiple callbacks
 on_best_loss = ModelCheckpoint(
     dirpath=args.save_filepath,
-    filename="paccmann_chemistry-{epoch:03d}-{val_loss:.3f}",
+    filename="paccmann_chemistry_best_loss",
     monitor="val_loss",
     save_top_k=1,
     mode="min",
 )
 on_best_kl_div = ModelCheckpoint(
     dirpath=args.save_filepath,
-    filename="paccmann_chemistry-{epoch:03d}-{val_loss:.3f}",
+    filename="paccmann_chemistry_best_kl_div",
     monitor="val_kl_div",
     save_top_k=1,
     mode="min",

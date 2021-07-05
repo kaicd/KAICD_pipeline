@@ -5,6 +5,7 @@ from typing import Tuple
 
 import torch as th
 import torch.nn as nn
+import torch.nn.functional as F
 import pytorch_lightning as pl
 from sklearn.metrics import (
     auc,
@@ -12,18 +13,19 @@ from sklearn.metrics import (
     precision_recall_curve,
     roc_curve,
 )
-from paccmann_predictor.utils.hyperparams import (
+
+from Utility.hyperparams import (
     ACTIVATION_FN_FACTORY,
     OPTIMIZER_FACTORY,
+    LOSS_FN_FACTORY,
 )
-from paccmann_predictor.utils.layers import (
+from Utility.layers import (
     alpha_projection,
     convolutional_layer,
     dense_layer,
     smiles_projection,
+    EnsembleLayer,
 )
-from toxsmi.utils.hyperparams import LOSS_FN_FACTORY
-from toxsmi.utils.layers import EnsembleLayer
 
 
 class MCA_lightning(pl.LightningModule):
@@ -101,7 +103,7 @@ class MCA_lightning(pl.LightningModule):
         self.loss_fn = LOSS_FN_FACTORY[
             params.get("loss_fn", "binary_cross_entropy_ignore_nan_and_sum")
         ]  # yapf: disable
-        self.opt_fn = OPTIMIZER_FACTORY[params.get("optimizer", "adam")]
+        self.opt_fn = OPTIMIZER_FACTORY[params.get("optimizer", "Adam")]
 
         self.num_tasks = params.get("num_tasks", 12)
         self.smiles_attention_size = params.get("smiles_attention_size", 64)
@@ -144,11 +146,7 @@ class MCA_lightning(pl.LightningModule):
             )
             # Plug in one hot-vectors and freeze weights
             self.smiles_embedding.load_state_dict(
-                {
-                    "weight": th.nn.functional.one_hot(
-                        th.arange(params["smiles_vocabulary_size"])
-                    )
-                }
+                {"weight": F.one_hot(th.arange(params["smiles_vocabulary_size"]))}
             )
             self.smiles_embedding.weight.requires_grad = False
 
