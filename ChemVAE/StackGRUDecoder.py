@@ -40,7 +40,7 @@ class StackGRUDecoder(StackGRU):
         """
         super(StackGRUDecoder, self).__init__(params, *args, **kwargs)
         self.params = params
-        self.latent_dim = params['latent_dim']
+        self.latent_dim = params["latent_dim"]
         self.latent_to_hidden = nn.Linear(
             in_features=self.latent_dim, out_features=self.rnn_cell_size
         )
@@ -48,9 +48,9 @@ class StackGRUDecoder(StackGRU):
 
         self.criterion = nn.CrossEntropyLoss()
 
-        self.optimizer = OPTIMIZER_FACTORY[
-            params.get('optimizer', 'adadelta')
-        ](self.parameters(), lr=params.get('lr', 0.01))  # yapf: disable
+        self.optimizer = OPTIMIZER_FACTORY[params.get("optimizer", "adadelta")](
+            self.parameters(), lr=params.get("lr", 0.01)
+        )  # yapf: disable
 
     def decoder_train_step(self, latent_z, input_seq, target_seq):
         """
@@ -85,17 +85,15 @@ class StackGRUDecoder(StackGRU):
         Returns:
             The cross-entropy training loss for the decoder.
         """
-        if isinstance(input_seq, nn.utils.rnn.PackedSequence) and \
-                not isinstance(input_seq, torch.Tensor):
-            raise TypeError('Input is PackedSequence or is not a Tensor')
+        if isinstance(input_seq, nn.utils.rnn.PackedSequence) and not isinstance(
+            input_seq, torch.Tensor
+        ):
+            raise TypeError("Input is PackedSequence or is not a Tensor")
 
         loss = 0
         outputs = []
-        for idx, (input_entry,
-                  target_entry) in enumerate(zip(input_seq, target_seq)):
-            output, hidden, stack = self(
-                input_entry.unsqueeze(0), hidden, stack
-            )
+        for idx, (input_entry, target_entry) in enumerate(zip(input_seq, target_seq)):
+            output, hidden, stack = self(input_entry.unsqueeze(0), hidden, stack)
             output = self.output_layer(output).squeeze(dim=0)
             loss += self.criterion(output, target_entry)
             outputs.append(output)
@@ -115,7 +113,7 @@ class StackGRUDecoder(StackGRU):
             The cross-entropy training loss for the decoder.
         """
         if not isinstance(input_seq, nn.utils.rnn.PackedSequence):
-            raise TypeError('Input is not PackedSequence')
+            raise TypeError("Input is not PackedSequence")
 
         loss = 0
         input_seq_packed, batch_sizes = utils.perpare_packed_input(input_seq)
@@ -145,12 +143,7 @@ class StackGRUDecoder(StackGRU):
         return loss
 
     def generate_from_latent(
-        self,
-        latent_z,
-        prime_input,
-        end_token,
-        search=SamplingSearch,
-        generate_len=100
+        self, latent_z, prime_input, end_token, search=SamplingSearch, generate_len=100
     ):
         """
         Generate SMILES From Latent Z.
@@ -193,16 +186,14 @@ class StackGRUDecoder(StackGRU):
         if is_beam:
             beams = [[[list(), 0.0]]] * batch_size
             input_token = torch.stack(
-                [input_token] +
-                [input_token.clone() for _ in range(search.beam_width - 1)]
+                [input_token]
+                + [input_token.clone() for _ in range(search.beam_width - 1)]
             )
             hidden = torch.stack(
-                [hidden] +
-                [hidden.clone() for _ in range(search.beam_width - 1)]
+                [hidden] + [hidden.clone() for _ in range(search.beam_width - 1)]
             )
             stack = torch.stack(
-                [stack] +
-                [stack.clone() for _ in range(search.beam_width - 1)]
+                [stack] + [stack.clone() for _ in range(search.beam_width - 1)]
             )
 
         for idx in range(generate_len):
@@ -221,22 +212,25 @@ class StackGRUDecoder(StackGRU):
                     break
             else:
 
-                output, hidden, stack = zip(*[
-                    self(an_input_token, a_hidden, a_stack)
-                    for an_input_token, a_hidden, a_stack in zip(
-                        input_token, hidden, stack
-                    )
-                ])  # yapf: disable
-                logits = torch.stack(
-                    [self.output_layer(o).squeeze() for o in output]
-                )
+                output, hidden, stack = zip(
+                    *[
+                        self(an_input_token, a_hidden, a_stack)
+                        for an_input_token, a_hidden, a_stack in zip(
+                            input_token, hidden, stack
+                        )
+                    ]
+                )  # yapf: disable
+                logits = torch.stack([self.output_layer(o).squeeze() for o in output])
                 hidden = torch.stack(hidden)
                 stack = torch.stack(stack)
                 input_token, beams = search.step(logits.detach().cpu(), beams)
                 input_token = input_token.unsqueeze(1)
         if is_beam:
-            generated_seq = torch.stack([
-                # get the list of tokens with the highest score
-                torch.tensor(beam[0][0]) for beam in beams
-            ])  # yapf: disable
+            generated_seq = torch.stack(
+                [
+                    # get the list of tokens with the highest score
+                    torch.tensor(beam[0][0])
+                    for beam in beams
+                ]
+            )  # yapf: disable
         return generated_seq

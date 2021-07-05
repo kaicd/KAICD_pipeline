@@ -36,7 +36,7 @@ class StackGRUEncoder(StackGRU):
         """
         super(StackGRUEncoder, self).__init__(params)
 
-        self.bidirectional = params.get('bidirectional', False)
+        self.bidirectional = params.get("bidirectional", False)
         self.n_directions = 2 if self.bidirectional else 1
 
         # In case of bidirectionality, we create a second StackGRU object that
@@ -44,14 +44,14 @@ class StackGRUEncoder(StackGRU):
         if self.bidirectional:
             self.backward_stackgru = StackGRU(params)
 
-        self.latent_dim = params['latent_dim']
+        self.latent_dim = params["latent_dim"]
         self.hidden_to_mu = nn.Linear(
             in_features=self.rnn_cell_size * self.n_directions,
-            out_features=self.latent_dim
+            out_features=self.latent_dim,
         )
         self.hidden_to_logvar = nn.Linear(
             in_features=self.rnn_cell_size * self.n_directions,
-            out_features=self.latent_dim
+            out_features=self.latent_dim,
         )
 
     def encoder_train_step(self, input_seq):
@@ -95,9 +95,10 @@ class StackGRUEncoder(StackGRU):
             logvar is the log of the latent variance of shape
                 `[1, batch_size, latent_dim]`.
         """
-        if isinstance(input_seq, nn.utils.rnn.PackedSequence) or \
-                not isinstance(input_seq, torch.Tensor):
-            raise TypeError('Input is PackedSequence or is not a Tensor')
+        if isinstance(input_seq, nn.utils.rnn.PackedSequence) or not isinstance(
+            input_seq, torch.Tensor
+        ):
+            raise TypeError("Input is PackedSequence or is not a Tensor")
         expanded_input_seq = input_seq.unsqueeze(1)
         for input_entry in expanded_input_seq:
             _output, hidden, stack = self(input_entry, hidden, stack)
@@ -106,7 +107,7 @@ class StackGRUEncoder(StackGRU):
 
         # Backward pass:
         if self.bidirectional:
-            assert len(input_seq.shape) == 2, 'Input Seq must be 2D Tensor.'
+            assert len(input_seq.shape) == 2, "Input Seq must be 2D Tensor."
             hidden_backward = self.backward_stackgru.init_hidden
             stack_backward = self.backward_stackgru.init_stack
 
@@ -114,11 +115,12 @@ class StackGRUEncoder(StackGRU):
             # We roll up time from end to start
             for input_entry_idx in range(len(expanded_input_seq) - 1, -1, -1):
 
-                _output_backward, hidden_backward, stack_backward = (
-                    self.backward_stackgru(
-                        expanded_input_seq[input_entry_idx], hidden_backward,
-                        stack_backward
-                    )
+                (
+                    _output_backward,
+                    hidden_backward,
+                    stack_backward,
+                ) = self.backward_stackgru(
+                    expanded_input_seq[input_entry_idx], hidden_backward, stack_backward
                 )
             # Concatenate forward and backward
             hidden_backward = self._post_gru_reshape(hidden_backward)
@@ -140,7 +142,7 @@ class StackGRUEncoder(StackGRU):
                 `[1, batch_size, latent_dim]`.
         """
         if not isinstance(input_seq, nn.utils.rnn.PackedSequence):
-            raise TypeError('Input is not PackedSequence')
+            raise TypeError("Input is not PackedSequence")
 
         final_hidden = hidden.detach().clone()
         final_stack = stack.detach().clone()
@@ -182,9 +184,7 @@ class StackGRUEncoder(StackGRU):
                 input_seq[i] = seq.index_select(0, idx)
 
             input_seq = utils.repack_sequence(input_seq)
-            input_seq_packed, batch_sizes = utils.perpare_packed_input(
-                input_seq
-            )
+            input_seq_packed, batch_sizes = utils.perpare_packed_input(input_seq)
 
             final_hidden = hidden_backward.detach().clone()
             prev_batch = batch_sizes[0]
@@ -192,25 +192,18 @@ class StackGRUEncoder(StackGRU):
             for input_entry, batch_size in zip(input_seq_packed, batch_sizes):
                 # for seq in input_seq:
                 final_hidden, hidden_backward = utils.manage_step_packed_vars(
-                    final_hidden,
-                    hidden_backward,
-                    batch_size,
-                    prev_batch,
-                    batch_dim=1
+                    final_hidden, hidden_backward, batch_size, prev_batch, batch_dim=1
                 )
                 final_stack, stack_backward = utils.manage_step_packed_vars(
-                    final_stack,
-                    stack_backward,
-                    batch_size,
-                    prev_batch,
-                    batch_dim=0
+                    final_stack, stack_backward, batch_size, prev_batch, batch_dim=0
                 )
                 prev_batch = batch_size
-                output_backward, hidden_backward, stack_backward = (
-                    self.backward_stackgru(
-                        input_entry.unsqueeze(0), hidden_backward,
-                        stack_backward
-                    )
+                (
+                    output_backward,
+                    hidden_backward,
+                    stack_backward,
+                ) = self.backward_stackgru(
+                    input_entry.unsqueeze(0), hidden_backward, stack_backward
                 )
             left_dims = hidden_backward.shape[1]
             final_hidden[:, :left_dims, :] = hidden_backward[:, :left_dims, :]
@@ -225,8 +218,8 @@ class StackGRUEncoder(StackGRU):
 
         if not torch.equal(torch.tensor(hidden.shape), self.expected_shape):
             raise ValueError(
-                f'GRU hidden layer has incorrect shape: {hidden.shape}. '
-                f'Expected shape: {self.expected_shape}'
+                f"GRU hidden layer has incorrect shape: {hidden.shape}. "
+                f"Expected shape: {self.expected_shape}"
             )
 
         # Layers x Batch x Cell_size ->  B x C

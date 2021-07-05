@@ -8,7 +8,7 @@ from torch.autograd import Variable
 
 from Utility.utils import get_device
 
-logger = logging.getLogger('stack_gru')
+logger = logging.getLogger("stack_gru")
 
 
 class StackGRU(nn.Module):
@@ -41,15 +41,15 @@ class StackGRU(nn.Module):
 
         super(StackGRU, self).__init__()
         self.device = get_device()
-        self.embedding_size = params['embedding_size']
-        self.rnn_cell_size = params['rnn_cell_size']
-        self.vocab_size = params['vocab_size']
-        self.stack_width = params['stack_width']
-        self.stack_depth = params['stack_depth']
-        self.n_layers = params['n_layers']
-        self._update_batch_size(params['batch_size'])
+        self.embedding_size = params["embedding_size"]
+        self.rnn_cell_size = params["rnn_cell_size"]
+        self.vocab_size = params["vocab_size"]
+        self.stack_width = params["stack_width"]
+        self.stack_depth = params["stack_depth"]
+        self.n_layers = params["n_layers"]
+        self._update_batch_size(params["batch_size"])
         self.gru_input = self.embedding_size
-        self.use_stack = params.get('use_stack', True)
+        self.use_stack = params.get("use_stack", True)
 
         # Create the update function conditioned on whether stack is used.
         if self.use_stack:
@@ -59,7 +59,7 @@ class StackGRU(nn.Module):
             )
         else:
             self.update = lambda inp, hidden, stack: (inp, stack)
-            logger.warning('Attention: No stack will be used')
+            logger.warning("Attention: No stack will be used")
         # Network
         self.stack_controls_layer = nn.Linear(
             in_features=self.rnn_cell_size, out_features=3
@@ -68,27 +68,22 @@ class StackGRU(nn.Module):
             in_features=self.rnn_cell_size, out_features=self.stack_width
         )
 
-        if params.get('embedding', 'learned') == 'learned':
+        if params.get("embedding", "learned") == "learned":
             self.embedding = nn.Embedding(
                 self.vocab_size,
                 self.embedding_size,
-                padding_idx=params.get('pad_index', 0)
+                padding_idx=params.get("pad_index", 0),
             )
-        elif params.get('embedding', 'learned') == 'one_hot':
+        elif params.get("embedding", "learned") == "one_hot":
             self.embedding_size = self.vocab_size
             self.embedding = nn.Embedding(
                 self.vocab_size,
                 self.embedding_size,
-                padding_idx=params.get('pad_index', 0)
+                padding_idx=params.get("pad_index", 0),
             )
             # Plug in one hot-vectors and freeze weights
             self.embedding.load_state_dict(
-                {
-                    'weight':
-                        torch.nn.functional.one_hot(
-                            torch.arange(self.vocab_size)
-                        )
-                }
+                {"weight": torch.nn.functional.one_hot(torch.arange(self.vocab_size))}
             )
             self.embedding.weight.requires_grad = False
 
@@ -97,10 +92,10 @@ class StackGRU(nn.Module):
             self.rnn_cell_size,
             self.n_layers,
             bidirectional=False,
-            dropout=params['dropout']
+            dropout=params["dropout"],
         )
 
-        self.set_batch_mode(params.get('batch_mode'))
+        self.set_batch_mode(params.get("batch_mode"))
 
         self._check_params()
 
@@ -115,12 +110,14 @@ class StackGRU(nn.Module):
         )
         # Variable to initialize hidden state and stack
         self.init_hidden = Variable(
-            torch.zeros(self.n_layers, self.batch_size,
-                        self.rnn_cell_size).to(self.device)
+            torch.zeros(self.n_layers, self.batch_size, self.rnn_cell_size).to(
+                self.device
+            )
         )
         self.init_stack = Variable(
-            torch.zeros(self.batch_size, self.stack_depth,
-                        self.stack_width).to(self.device)
+            torch.zeros(self.batch_size, self.stack_depth, self.stack_width).to(
+                self.device
+            )
         )
 
     def forward(self, input_token, hidden, stack):
@@ -163,15 +160,15 @@ class StackGRU(nn.Module):
                 `padded`, `packed`
         """
         if not isinstance(mode, str):
-            raise TypeError('Argument `mode` should be a string.')
+            raise TypeError("Argument `mode` should be a string.")
         mode = mode.capitalize()
         MODES = {
-            'Padded': self._forward_pass_padded,
-            'Packed': self._forward_pass_packed
+            "Padded": self._forward_pass_padded,
+            "Packed": self._forward_pass_packed,
         }
         if mode not in MODES:
             raise NotImplementedError(
-                f'Unknown mode: {mode}. Available modes: {MODES.keys()}'
+                f"Unknown mode: {mode}. Available modes: {MODES.keys()}"
             )
         self._forward_fn = MODES[mode]
 
@@ -209,9 +206,7 @@ class StackGRU(nn.Module):
         controls = controls.view(-1, 3, 1, 1)
         zeros_at_the_bottom = torch.zeros(batch_size, 1, self.stack_width)
         zeros_at_the_bottom = Variable(zeros_at_the_bottom.to(self.device))
-        a_push, a_pop, a_no_op = (
-            controls[:, 0], controls[:, 1], controls[:, 2]
-        )
+        a_push, a_pop, a_no_op = (controls[:, 0], controls[:, 1], controls[:, 2])
         stack_down = torch.cat((prev_stack[:, 1:], zeros_at_the_bottom), dim=1)
         stack_up = torch.cat((input_val, prev_stack[:, :-1]), dim=1)
         new_stack = a_no_op * prev_stack
@@ -225,4 +220,4 @@ class StackGRU(nn.Module):
         """
 
         if self.rnn_cell_size < self.embedding_size:
-            logger.warning('Refrain from squashing embeddings in RNN cells')
+            logger.warning("Refrain from squashing embeddings in RNN cells")
