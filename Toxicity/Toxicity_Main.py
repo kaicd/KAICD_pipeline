@@ -30,7 +30,7 @@ parser.add_argument("--seed", type=int, default=42)
 parser.add_argument(
     "--params_filepath",
     type=str,
-    default="utils/toxsmi.json",
+    default="Config/toxsmi.json",
     help="Path to the parameter file.",
 )
 parser.add_argument(
@@ -55,7 +55,7 @@ with open(args.params_filepath) as f:
     params.update(json.load(f))
 if params["embedding"] == "pretrained":
     params.update({"embedding_path": args.project_filepath + args.embedding_path})
-    with open(args.project_filepath + args.params_filepath, "w") as f:
+    with open(args.params_filepath, "w") as f:
         json.dump(params, f)
 
 # Define dataset and model

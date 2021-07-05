@@ -32,32 +32,32 @@ logger_m.setLevel(logging.WARNING)
 # yapf: disable
 parser = argparse.ArgumentParser(description='PaccMann^RL training script')
 parser.add_argument(
-    'mol_model_path', type=str, help='Path to chemistry model'
+    '--mol_model_path', type=str, help='Path to chemistry model', default="/raid/paccmann-covid/models/SELFIESVAE"
 )
 parser.add_argument(
-    'protein_model_path', type=str, help='Path to protein model'
+    '--protein_model_path', type=str, help='Path to protein model', default="/raid/paccmann-covid/models/ProteinVAE"
 )
 parser.add_argument(
-    'affinity_model_path', type=str, help='Path to pretrained affinity model'
+    '--affinity_model_path', type=str, help='Path to pretrained affinity model', default="/raid/paccmann-covid/models/affinity"
 )
 parser.add_argument(
-    'protein_data_path', type=str, help='Path to protein data for conditioning'
+    '--protein_data_path', type=str, help='Path to protein data for conditioning', default="/raid/paccmann-covid/data/training/merged_sequence_encoding/uniprot_covid-19.csv"
 )
 parser.add_argument(
-    'params_path', type=str, help='Model params json file directory'
+    '--params_path', type=str, help='Model params json file directory', default="Config/conditional_generator.json"
 )
 parser.add_argument(
-    'model_name', type=str, help='Name for the trained model.'
+    '--model_name', type=str, help='Name for the trained model.', default="paccmann_sarscov2"
 )
 parser.add_argument(
-    'test_protein_id', type=int, help='ID of testing protein (LOOCV).'
+    '--test_protein_id', type=int, help='ID of testing protein (LOOCV).', default=35
 )
 parser.add_argument(
-    'unbiased_predictions_path', type=str,
-    help='Path to folder with aff. preds for 3000 mols from unbiased generator'
+    '--unbiased_predictions_path', type=str,
+    help='Path to folder with aff. preds for 3000 mols from unbiased generator', default="/raid/paccmann-covid/data/training/unbiased_predictions"
 )
 parser.add_argument(
-    '--tox21_path', help='Optional path to Tox21 model.'
+    '--tox21_path', help='Optional path to Tox21 model.', default="/raid/paccmann-covid/models/Tox21"
 )
 parser.add_argument(
     '--organdb_path', help='Optional path to OrganDB model.'

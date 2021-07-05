@@ -73,7 +73,7 @@ params.update(
         "protein_vocabulary_size": protein_language.number_of_tokens,
     }
 )
-with open(args.project_filepath + args.params_filepath, "w") as f:
+with open(args.params_filepath, "w") as f:
     json.dump(params, f)
 
 # Define dataset and model

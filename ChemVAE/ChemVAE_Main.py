@@ -76,7 +76,7 @@ params.update(
 if params.get("embedding", "learned") == "one_hot":
     params.update({"embedding_size": params["vocab_size"]})
 
-with open(args.project_filepath + args.params_filepath, "w") as f:
+with open(args.params_filepath, "w") as f:
     json.dump(params, f)
 
 # Define dataset and model
