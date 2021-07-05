@@ -30,7 +30,7 @@ It will be implemented soon...
 (paccmann_sarscov2) $ PYTHONPATH='./' python ./Toxicity/Toxicity_Main.py
 ```
 
-### protein VAE
+### protein VAE(Pytorch-Lightning)
 ```console
 (paccmann_sarscov2) $ PYTHONPATH='./' python ./ProtVAE/ProtVAE_Main.py
 ```
