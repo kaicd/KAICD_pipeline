@@ -12,9 +12,14 @@ with open("Config/PaccMann.yaml") as f:
 
 cmd = "python ./" + cfg["model"] + "/" + cfg["model"] + "_Main.py"
 
+wandb_cfg = cfg["wandb"]
+for key in wandb_cfg.keys():
+    if wandb_cfg[key] is not None:
+        cmd += " --" + key + " " + wandb_cfg[key]
+
 model_cfg = cfg[cfg["model"] + "_filepath"]
 for key in model_cfg.keys():
     if model_cfg[key] is not None:
-        cmd += " --" + model_cfg[key]
+        cmd += " --" + key + " " + model_cfg[key]
 
 subprocess.call(cmd, shell=True)

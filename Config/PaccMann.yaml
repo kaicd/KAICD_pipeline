@@ -18,7 +18,7 @@ DTI_filepath:
 Toxicity_filepath:
   project_filepath: "/raid/PaccMann_sarscov2/"
   save_filepath: "/raid/PaccMann_sarscov2/paccmann_toxsmi/checkpoint/"
-  params_filepath: "Config/affinity.json"
+  params_filepath: "Config/toxsmi.json"
   embedding_path: "data/pretraining/toxicity_predictor/smiles_vae_embeddings.pkl"
   train_score_filepath: "data/pretraining/toxicity_predictor/tox21_train.csv"
   test_score_filepath: "data/pretraining/toxicity_predictor/tox21_test.csv"
