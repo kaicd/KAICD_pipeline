@@ -18,26 +18,26 @@ Also, the workload required to run the full pipeline is intensive and might not 
 
 
 # PaccMann_rl generator(Pytorch-Lightning)
-```console
-(paccmann_sarscov2) $ PYTHONPATH='./' python ./main/pl_train_generator.py
-```
+It will be implemented soon...
 
 ### affinity predictor(Pytorch-Lightning)
 ```console
-(paccmann_sarscov2) $ PYTHONPATH='./' python ./main/pl_train_affinity.py
+(paccmann_sarscov2) $ PYTHONPATH='./' python ./DTI/DTI_Main.py.py
 ```
 
 ### toxicity predictor(Pytorch-Lightning)
 ```console
-(paccmann_sarscov2) $ PYTHONPATH='./' python ./main/pl_train_toxicity.py
+(paccmann_sarscov2) $ PYTHONPATH='./' python ./Toxicity/Toxicity_Main.py
 ```
 
 ### protein VAE
-It will be implemented soon...
+```console
+(paccmann_sarscov2) $ PYTHONPATH='./' python ./ProtVAE/ProtVAE_Main.py
+```
 
 ### SELFIES VAE(Pytorch-Lightning)
 ```console
-(paccmann_sarscov2) $ PYTHONPATH='./' python ./main/pl_train_selfies.py
+(paccmann_sarscov2) $ PYTHONPATH='./' python ./ChemVAE/ChemVAE_Main.py
 ```
 
 ### SMILESDataset data to SMILES
@@ -54,7 +54,7 @@ for data in batch:
 # PaccMann_rl generator(train_conditional_generator.py : Not implemented by Pytorch-Lightning)
 ```console
 (paccmann_sarscov2) $ for protein_id in (seq 40)
-  python ./main/train_conditional_generator.py \
+  python ./Reinforce/Reinforce_Main.py \
   /raid/paccmann-covid/models/SELFIESVAE \
   /raid/paccmann-covid/models/ProteinVAE \
   /raid/paccmann-covid/models/affinity \
