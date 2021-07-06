@@ -183,7 +183,6 @@ class BimodalMCA_lightning(pl.LightningModule):
         )
 
         # Convolutions
-        # TODO: Use nn.ModuleDict instead of the nn.Seq/OrderedDict
         self.smiles_convolutional_layers = nn.Sequential(
             OrderedDict(
                 [
