@@ -139,18 +139,3 @@ class ChemVAE(pl.LightningModule):
         }
 
         return [opt], [sched]
-
-    def _associate_language(self, language):
-        """
-        Raises:
-            TypeError:
-        """
-        if isinstance(language, SMILESLanguage):
-            self.smiles_language = language
-
-        else:
-            raise TypeError(
-                "Please insert a smiles language (object of type "
-                "pytoda.smiles.smiles_language.SMILESLanguage . Given was "
-                f"{type(language)}"
-            )

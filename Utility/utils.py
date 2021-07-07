@@ -26,8 +26,9 @@ from pytoda.files import read_smi
 
 logger = logging.getLogger(__name__)
 
+
 def get_device():
-    return torch.device('cuda' if cuda() else 'cpu')
+    return torch.device("cuda" if cuda() else "cpu")
 
 
 def cuda():
@@ -653,6 +654,27 @@ def get_log_molar(y, ic50_max=None, ic50_min=None):
     Converts PaccMann predictions from [0,1] to log(micromolar) range.
     """
     return y * (ic50_max - ic50_min) + ic50_min
+
+
+def generate_mols_img(mols, sub_img_size=(512, 512), legends=None, row=2, **kwargs):
+    if legends is None:
+        legends = [None] * len(mols)
+    res = pilimg.new(
+        "RGBA",
+        (
+            sub_img_size[0] * row,
+            sub_img_size[1] * (len(mols) // row)
+            if len(mols) % row == 0
+            else sub_img_size[1] * ((len(mols) // row) + 1),
+        ),
+    )
+    for i, mol in enumerate(mols):
+        res.paste(
+            Draw.MolToImage(mol, sub_img_size, legend=legends[i], **kwargs),
+            ((i // row) * sub_img_size[0], (i % row) * sub_img_size[1]),
+        )
+
+    return res
 
 
 class Squeeze(nn.Module):

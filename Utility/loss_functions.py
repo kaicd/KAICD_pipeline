@@ -17,7 +17,7 @@ def vae_loss_function(
     logvar: torch.Tensor,
     kl_growth: float = 0.0015,
     step: int = None,
-    eval_mode: bool = False
+    eval_mode: bool = False,
 ) -> (torch.Tensor, torch.Tensor):
     """
     Loss Function for VAE.
@@ -46,7 +46,7 @@ def vae_loss_function(
     kl_div = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
 
     if eval_mode:
-        kl_w = 1.
+        kl_w = 1.0
     else:
         kl_w = kl_weight(step, growth_rate=kl_growth)
     return kl_w * kl_div + decoder_loss, kl_div
@@ -106,16 +106,16 @@ def pearsonr(x, y):
         Pearson correlation coefficient.
     """
     if not isinstance(x, torch.Tensor) or not isinstance(y, torch.Tensor):
-        raise TypeError('Function expects torch Tensors.')
+        raise TypeError("Function expects torch Tensors.")
 
     if len(x.shape) > 1 or len(y.shape) > 1:
-        raise ValueError(' x and y must be 1D Tensors.')
+        raise ValueError(" x and y must be 1D Tensors.")
 
     if len(x) != len(y):
-        raise ValueError('x and y must have the same length.')
+        raise ValueError("x and y must have the same length.")
 
     if len(x) < 2:
-        raise ValueError('x and y must have length at least 2.')
+        raise ValueError("x and y must have length at least 2.")
 
     # If an input is constant, the correlation coefficient is not defined.
     if bool((x == x[0]).all()) or bool((y == y[0]).all()):
@@ -123,9 +123,8 @@ def pearsonr(x, y):
 
     mx = x - torch.mean(x)
     my = y - torch.mean(y)
-    cost = (
-        torch.sum(mx * my) /
-        (torch.sqrt(torch.sum(mx**2)) * torch.sqrt(torch.sum(my**2)))
+    cost = torch.sum(mx * my) / (
+        torch.sqrt(torch.sum(mx ** 2)) * torch.sqrt(torch.sum(my ** 2))
     )
     return torch.clamp(cost, min=-1.0, max=1.0)
 
@@ -141,10 +140,12 @@ def correlation_coefficient_loss(labels, predictions):
         torch.Tensor: A loss that when minimized forces high squared correlation coefficient:
         \$1 - r(labels, predictions)^2\$  # noqa
     """
-    return 1 - pearsonr(labels, predictions)**2
+    return 1 - pearsonr(labels, predictions) ** 2
 
 
-def joint_loss(outputs, targets, reconstruction_loss, kld_loss, mu, logvar, alpha=0.5, beta=1.):
+def joint_loss(
+    outputs, targets, reconstruction_loss, kld_loss, mu, logvar, alpha=0.5, beta=1.0
+):
     """Loss Function from VAE paper.
     Reference:
         Kingma and Welling. Auto-Encoding Variational Bayes. ICLR, 2014
@@ -187,29 +188,21 @@ class BCEIgnoreNaN(nn.Module):
                 Defaults to (1, 1), i.e. equal class weighhts.
         """
         super(BCEIgnoreNaN, self).__init__()
-        self.loss = nn.BCELoss(reduction='none')
+        self.loss = nn.BCELoss(reduction="none")
 
-        if reduction != 'sum' and reduction != 'mean':
-            raise ValueError(
-                f'Chose reduction type as mean or sum, not {reduction}'
-            )
+        if reduction != "sum" and reduction != "mean":
+            raise ValueError(f"Chose reduction type as mean or sum, not {reduction}")
         self.reduction = reduction
 
         if not isinstance(class_weights, Iterable):
-            raise TypeError(
-                f'Pass iterable for weights, not: {type(class_weights)}'
-            )
+            raise TypeError(f"Pass iterable for weights, not: {type(class_weights)}")
         if not len(class_weights) == 2:
-            raise ValueError(
-                f'Class weight len should be 2, not: {len(class_weights)}'
-            )
+            raise ValueError(f"Class weight len should be 2, not: {len(class_weights)}")
         if not all(w > 0 for w in class_weights):
-            raise ValueError(
-                f'All weigths should be positive not: {class_weights}'
-            )
+            raise ValueError(f"All weigths should be positive not: {class_weights}")
 
         self.class_weights = class_weights
-        logger.info(f'Class weights are {class_weights}.')
+        logger.info(f"Class weights are {class_weights}.")
 
     def forward(self, yhat: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
         """
@@ -240,8 +233,7 @@ class BCEIgnoreNaN(nn.Module):
 
         out = loss * weight_tensor
 
-        if self.reduction == 'mean':
+        if self.reduction == "mean":
             return torch.mean(out)
-        elif self.reduction == 'sum':
+        elif self.reduction == "sum":
             return torch.sum(out)
-

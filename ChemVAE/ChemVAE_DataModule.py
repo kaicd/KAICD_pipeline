@@ -13,7 +13,7 @@ from torch.utils.data.dataloader import DataLoader
 class SELFIES_VAE_lightning(pl.LightningDataModule):
     @classmethod
     def add_argparse_args(
-            cls, parent_parser: ArgumentParser, **kwargs
+        cls, parent_parser: ArgumentParser, **kwargs
     ) -> ArgumentParser:
         parser = parent_parser.add_argument_group(cls.__name__)
         parser.add_argument(

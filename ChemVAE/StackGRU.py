@@ -50,18 +50,7 @@ class StackGRU(nn.Module):
         self.stack_width = params["stack_width"]
         self.stack_depth = params["stack_depth"]
         self.n_layers = params["n_layers"]
-        self.batch_size = params["batch_size"]
-        self.expected_shape = torch.tensor(
-            [self.n_layers, self.batch_size, self.rnn_cell_size]
-        )
-
-        # Variable to initialize hidden state and stack
-        self.init_hidden = Variable(
-            torch.zeros(self.n_layers, self.batch_size, self.rnn_cell_size)
-        )
-        self.init_stack = Variable(
-            torch.zeros(self.batch_size, self.stack_depth, self.stack_width)
-        )
+        self._update_batch_size(params["batch_size"])
         self.gru_input = self.embedding_size
         self.use_stack = params.get("use_stack", True)
 
@@ -149,7 +138,7 @@ class StackGRU(nn.Module):
     def _forward_pass_packed(self, *args):
         raise NotImplementedError
 
-    def _update_batch_size(self, batch_size: int) -> None:
+    def _update_batch_size(self, batch_size: int, device: torch.device = None) -> None:
         """Updates the batch_size
         Arguments:
             batch_size (int): New batch size
@@ -160,10 +149,14 @@ class StackGRU(nn.Module):
         )
         # Variable to initialize hidden state and stack
         self.init_hidden = Variable(
-            torch.zeros(self.n_layers, self.batch_size, self.rnn_cell_size)
+            torch.zeros(self.n_layers, self.batch_size, self.rnn_cell_size).to(device)
+            if device is not None
+            else torch.zeros(self.n_layers, self.batch_size, self.rnn_cell_size)
         )
         self.init_stack = Variable(
-            torch.zeros(self.batch_size, self.stack_depth, self.stack_width)
+            torch.zeros(self.batch_size, self.stack_depth, self.stack_width).to(device)
+            if device is not None
+            else torch.zeros(self.batch_size, self.stack_depth, self.stack_width)
         )
 
     def _check_params(self):
@@ -172,3 +165,18 @@ class StackGRU(nn.Module):
         """
         if self.rnn_cell_size < self.embedding_size:
             logger.warning("Refrain from squashing embeddings in RNN cells")
+
+    def _associate_language(self, language):
+        """
+        Raises:
+            TypeError:
+        """
+        if isinstance(language, SMILESLanguage):
+            self.smiles_language = language
+
+        else:
+            raise TypeError(
+                "Please insert a smiles language (object of type "
+                "pytoda.smiles.smiles_language.SMILESLanguage . Given was "
+                f"{type(language)}"
+            )

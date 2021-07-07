@@ -133,21 +133,7 @@ class StackGRUDecoder(StackGRU):
         Note: For each generated sequence all indices after the first
             end_token must be discarded.
         """
-        self.batch_size = latent_z.shape[1]
-        self.expected_shape = th.tensor(
-            [self.n_layers, self.batch_size, self.rnn_cell_size]
-        )
-        # Variable to initialize hidden state and stack
-        self.init_hidden = Variable(
-            th.zeros(self.n_layers, self.batch_size, self.rnn_cell_size).to(
-                latent_z.device
-            )
-        )
-        self.init_stack = Variable(
-            th.zeros(self.batch_size, self.stack_depth, self.stack_width).to(
-                latent_z.device
-            )
-        )
+        self._update_batch_size(latent_z.shape[1], device=latent_z.device)
         latent_z = latent_z.repeat(self.n_layers, 1, 1)
         hidden = self.latent_to_hidden(latent_z)
         stack = self.init_stack

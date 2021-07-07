@@ -80,7 +80,11 @@ class ProtVAE(pl.LightningModule):
         return sample
 
     def shared_step(self, batch, mode, *args, **kwargs):
-        _batch = augment(batch, dropout=self.DAE_mask, sigma=self.DAE_noise).to(self.device) if mode == "train" else batch
+        _batch = (
+            augment(batch, dropout=self.DAE_mask, sigma=self.DAE_noise).to(self.device)
+            if mode == "train"
+            else batch
+        )
         _batch_fake = self(_batch).to(th.float32)
         loss, rec, kld = joint_loss(
             _batch_fake,

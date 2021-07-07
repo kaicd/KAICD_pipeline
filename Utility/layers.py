@@ -24,8 +24,9 @@ def collapsing_layer(inputs, act_fn=nn.ReLU()):
     collapse = nn.Sequential(
         OrderedDict(
             [
-                ('dense', nn.Linear(inputs.shape[-1], 1)), ('act_fn', act_fn),
-                ('squeeze', Squeeze())
+                ("dense", nn.Linear(inputs.shape[-1], 1)),
+                ("act_fn", act_fn),
+                ("squeeze", Squeeze()),
             ]
         )
     )
@@ -56,8 +57,8 @@ def apply_dense_attention_layer(inputs, return_alphas=False):
     attention_layer = nn.Sequential(
         OrderedDict(
             [
-                ('dense', nn.Linear(inputs.shape[1], inputs.shape[1])),
-                ('softmax', nn.Softmax())
+                ("dense", nn.Linear(inputs.shape[1], inputs.shape[1])),
+                ("softmax", nn.Softmax()),
             ]
         )
     )
@@ -68,25 +69,25 @@ def apply_dense_attention_layer(inputs, return_alphas=False):
 
 
 def dense_layer(
-    input_size, hidden_size, act_fn=nn.ReLU(), batch_norm=False, dropout=0.
+    input_size, hidden_size, act_fn=nn.ReLU(), batch_norm=False, dropout=0.0
 ):
     return nn.Sequential(
         OrderedDict(
             [
-                ('projection', nn.Linear(input_size, hidden_size)),
+                ("projection", nn.Linear(input_size, hidden_size)),
                 (
-                    'batch_norm', nn.BatchNorm1d(hidden_size)
-                    if batch_norm else nn.Identity()
+                    "batch_norm",
+                    nn.BatchNorm1d(hidden_size) if batch_norm else nn.Identity(),
                 ),
-                ('act_fn', act_fn),
-                ('dropout', nn.Dropout(p=dropout)),
+                ("act_fn", act_fn),
+                ("dropout", nn.Dropout(p=dropout)),
             ]
         )
     )
 
 
 def dense_attention_layer(
-    number_of_features: int, temperature: float = 1., dropout=0.
+    number_of_features: int, temperature: float = 1.0, dropout=0.0
 ) -> nn.Sequential:
     """Attention mechanism layer for dense inputs.
 
@@ -101,10 +102,10 @@ def dense_attention_layer(
     return nn.Sequential(
         OrderedDict(
             [
-                ('dense', nn.Linear(number_of_features, number_of_features)),
-                ('dropout', nn.Dropout(p=dropout)),
-                ('temperature', Temperature(temperature)),
-                ('softmax', nn.Softmax(dim=-1))
+                ("dense", nn.Linear(number_of_features, number_of_features)),
+                ("dropout", nn.Dropout(p=dropout)),
+                ("temperature", Temperature(temperature)),
+                ("softmax", nn.Softmax(dim=-1)),
             ]
         )
     )
@@ -115,8 +116,8 @@ def convolutional_layer(
     kernel_size,
     act_fn=nn.ReLU(),
     batch_norm=False,
-    dropout=0.,
-    input_channels=1
+    dropout=0.0,
+    input_channels=1,
 ):
     """Convolutional layer.
 
@@ -135,21 +136,21 @@ def convolutional_layer(
         OrderedDict(
             [
                 (
-                    'convolve',
+                    "convolve",
                     torch.nn.Conv2d(
                         input_channels,  # channel_in
                         num_kernel,  # channel_out
                         kernel_size,  # kernel_size
-                        padding=[kernel_size[0] // 2, 0]  # pad for valid conv.
-                    )
+                        padding=[kernel_size[0] // 2, 0],  # pad for valid conv.
+                    ),
                 ),
-                ('squeeze', Squeeze()),
-                ('act_fn', act_fn),
-                ('dropout', nn.Dropout(p=dropout)),
+                ("squeeze", Squeeze()),
+                ("act_fn", act_fn),
+                ("dropout", nn.Dropout(p=dropout)),
                 (
-                    'batch_norm',
-                    nn.BatchNorm1d(num_kernel) if batch_norm else nn.Identity()
-                )
+                    "batch_norm",
+                    nn.BatchNorm1d(num_kernel) if batch_norm else nn.Identity(),
+                ),
             ]
         )
     )
@@ -159,21 +160,20 @@ def gene_projection(num_genes, attention_size, ind_nonlin=nn.Sequential()):
     return nn.Sequential(
         OrderedDict(
             [
-                ('projection', nn.Linear(num_genes, attention_size)),
-                ('act_fn', ind_nonlin), ('expand', Unsqueeze(1))
+                ("projection", nn.Linear(num_genes, attention_size)),
+                ("act_fn", ind_nonlin),
+                ("expand", Unsqueeze(1)),
             ]
         )
     )
 
 
-def smiles_projection(
-    smiles_hidden_size, attention_size, ind_nonlin=nn.Sequential()
-):
+def smiles_projection(smiles_hidden_size, attention_size, ind_nonlin=nn.Sequential()):
     return nn.Sequential(
         OrderedDict(
             [
-                ('projection', nn.Linear(smiles_hidden_size, attention_size)),
-                ('act_fn', ind_nonlin)
+                ("projection", nn.Linear(smiles_hidden_size, attention_size)),
+                ("act_fn", ind_nonlin),
             ]
         )
     )
@@ -183,8 +183,9 @@ def alpha_projection(attention_size):
     return nn.Sequential(
         OrderedDict(
             [
-                ('projection', nn.Linear(attention_size, 1, bias=False)),
-                ('squeeze', Squeeze()), ('softmax', nn.Softmax(dim=1))
+                ("projection", nn.Linear(attention_size, 1, bias=False)),
+                ("squeeze", Squeeze()),
+                ("softmax", nn.Softmax(dim=1)),
             ]
         )
     )
@@ -207,7 +208,7 @@ class ContextAttentionLayer(nn.Module):
         context_hidden_size: int,
         context_sequence_length: int = 1,
         attention_size: int = 16,
-        individual_nonlinearity: type = nn.Sequential()
+        individual_nonlinearity: type = nn.Sequential(),
     ):
         """Constructor
         Arguments:
@@ -238,37 +239,49 @@ class ContextAttentionLayer(nn.Module):
         self.individual_nonlinearity = individual_nonlinearity
 
         # Project the reference into the attention space
-        self.reference_projection = nn.Sequential(OrderedDict([
-            ('projection', nn.Linear(reference_hidden_size, attention_size)),
-            ('act_fn', individual_nonlinearity)
-        ]))  # yapf: disable
+        self.reference_projection = nn.Sequential(
+            OrderedDict(
+                [
+                    ("projection", nn.Linear(reference_hidden_size, attention_size)),
+                    ("act_fn", individual_nonlinearity),
+                ]
+            )
+        )  # yapf: disable
 
         # Project the context into the attention space
-        self.context_projection = nn.Sequential(OrderedDict([
-            ('projection', nn.Linear(context_hidden_size, attention_size)),
-            ('act_fn', individual_nonlinearity)
-        ]))  # yapf: disable
+        self.context_projection = nn.Sequential(
+            OrderedDict(
+                [
+                    ("projection", nn.Linear(context_hidden_size, attention_size)),
+                    ("act_fn", individual_nonlinearity),
+                ]
+            )
+        )  # yapf: disable
 
         # Optionally reduce the hidden size in context
         if context_sequence_length > 1:
-            self.context_hidden_projection = nn.Sequential(OrderedDict([
-                (
-                    'projection',
-                    nn.Linear(
-                        context_sequence_length,
-                        reference_sequence_length
-                    )
-                ),
-                ('act_fn', individual_nonlinearity)
-            ]))  # yapf: disable
+            self.context_hidden_projection = nn.Sequential(
+                OrderedDict(
+                    [
+                        (
+                            "projection",
+                            nn.Linear(
+                                context_sequence_length, reference_sequence_length
+                            ),
+                        ),
+                        ("act_fn", individual_nonlinearity),
+                    ]
+                )
+            )  # yapf: disable
         else:
             self.context_hidden_projection = nn.Sequential()
 
         self.alpha_projection = nn.Sequential(
             OrderedDict(
                 [
-                    ('projection', nn.Linear(attention_size, 1, bias=False)),
-                    ('squeeze', Squeeze()), ('softmax', nn.Softmax(dim=1))
+                    ("projection", nn.Linear(attention_size, 1, bias=False)),
+                    ("squeeze", Squeeze()),
+                    ("softmax", nn.Softmax(dim=1)),
                 ]
             )
         )
@@ -288,8 +301,8 @@ class ContextAttentionLayer(nn.Module):
                 batch_size x context_hidden_size x 1) and the second one the
                 attention weights (batch_size x context_sequence_length x 1).
         """
-        assert len(reference.shape) == 3, 'Reference tensor needs to be 3D'
-        assert len(context.shape) == 3, 'Context tensor needs to be 3D'
+        assert len(reference.shape) == 3, "Reference tensor needs to be 3D"
+        assert len(context.shape) == 3, "Context tensor needs to be 3D"
 
         reference_attention = self.reference_projection(reference)
         context_attention = self.context_hidden_projection(
@@ -309,9 +322,7 @@ class EnsembleLayer(nn.Module):
     model ensembles.
     """
 
-    def __init__(
-            self, typ, input_size, output_size, ensemble_size=5, fn=nn.ReLU()
-    ):
+    def __init__(self, typ, input_size, output_size, ensemble_size=5, fn=nn.ReLU()):
         """
         Args:
             typ    {str} from {'pron', 'score'} depending on whether the
@@ -330,20 +341,17 @@ class EnsembleLayer(nn.Module):
         self.ensemble_size = ensemble_size
         self.act_fn = fn
 
-        if typ == 'prob':
+        if typ == "prob":
             self.ensemble = nn.ModuleList(
                 [
-                    nn.Sequential(nn.Linear(input_size, output_size),
-                                  fn) for _ in range(ensemble_size)
+                    nn.Sequential(nn.Linear(input_size, output_size), fn)
+                    for _ in range(ensemble_size)
                 ]
             )
 
-        elif typ == 'score':
+        elif typ == "score":
             self.ensemble = nn.ModuleList(
-                [
-                    nn.Linear(input_size, output_size)
-                    for _ in range(ensemble_size)
-                ]
+                [nn.Linear(input_size, output_size) for _ in range(ensemble_size)]
             )
 
         else:
@@ -361,7 +369,7 @@ class EnsembleLayer(nn.Module):
 
         dist = [e(x) for e in self.ensemble]
         output = torch.mean(torch.stack(dist), dim=0)
-        if self.type == 'score':
+        if self.type == "score":
             output = self.act_fn(output)
 
         return output

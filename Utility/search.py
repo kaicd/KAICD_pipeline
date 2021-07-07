@@ -23,13 +23,9 @@ class Search(nn.Module):
             object: the search output.
         """
         if not len(logits.shape) == 3:
-            raise ValueError(
-                f'Logits need to be 3D Tensor, was: {logits.shape}'
-            )
+            raise ValueError(f"Logits need to be 3D Tensor, was: {logits.shape}")
         if not type(logits) == torch.Tensor:
-            raise TypeError(
-                f'Logits need to be torch.Tensor, was: {type(logits)}'
-            )
+            raise TypeError(f"Logits need to be torch.Tensor, was: {type(logits)}")
 
     def step(self, logits: torch.Tensor) -> object:
         """
@@ -42,13 +38,9 @@ class Search(nn.Module):
             object: the search output.
         """
         if len(logits.shape) > 3:
-            raise ValueError(
-                f'Logits need to be 2D or 3D Tensor, was: {logits.shape}'
-            )
+            raise ValueError(f"Logits need to be 2D or 3D Tensor, was: {logits.shape}")
         if not type(logits) == torch.Tensor:
-            raise TypeError(
-                f'Logits need to be torch.Tensor, was: {type(logits)}'
-            )
+            raise TypeError(f"Logits need to be torch.Tensor, was: {type(logits)}")
 
 
 class GreedySearch(Search):
@@ -113,10 +105,7 @@ class SamplingSearch(Search):
         super().forward(logits)
         probabilities = torch.softmax(logits.div(self.temperature), 2)
         return torch.stack(
-            [
-                torch.multinomial(probability, 1)
-                for probability in probabilities
-            ]
+            [torch.multinomial(probability, 1) for probability in probabilities]
         ).squeeze()
 
     def step(self, logits: torch.Tensor) -> torch.Tensor:
@@ -132,10 +121,7 @@ class SamplingSearch(Search):
         super().step(logits)
         probabilities = torch.softmax(logits.div(self.temperature), 1)
         return torch.stack(
-            [
-                torch.multinomial(probability, 1)
-                for probability in probabilities
-            ]
+            [torch.multinomial(probability, 1) for probability in probabilities]
         )
 
 
@@ -166,9 +152,7 @@ class BeamSearch(Search):
         self.temperature = temperature
         self.top_tokens = top_tokens
 
-    def _beam_step_per_sequence(
-        self, probabilities: torch.Tensor, beams: list
-    ) -> list:
+    def _beam_step_per_sequence(self, probabilities: torch.Tensor, beams: list) -> list:
         """
         Perform a beam search step.
 
@@ -186,19 +170,17 @@ class BeamSearch(Search):
         for probability, beam in zip(probabilities, beams):
             a_sequence, score = beam
             # Sort the probabilities over dict and select indices of top n
-            top_token_indexes = np.argsort(-probability)[:self.top_tokens]
+            top_token_indexes = np.argsort(-probability)[: self.top_tokens]
             for top_token in top_token_indexes:
                 candidate = [
                     a_sequence + [top_token],
-                    score + log(probability[top_token] + float_info.epsilon)
+                    score + log(probability[top_token] + float_info.epsilon),
                 ]
                 all_candidates.append(candidate)
         # order all candidates by score
-        ordered = sorted(
-            all_candidates, key=lambda pair: pair[1], reverse=True
-        )
+        ordered = sorted(all_candidates, key=lambda pair: pair[1], reverse=True)
         # select best
-        return ordered[:self.beam_width]
+        return ordered[: self.beam_width]
 
     def _beam_per_sequence(self, logits: torch.Tensor) -> tuple:
         """
@@ -218,8 +200,7 @@ class BeamSearch(Search):
         # walk over each step in sequence
         for probability in probabilities:
             probability_beams = torch.stack(
-                [probability] +
-                [probability.clone() for _ in range(self.beam_width)]
+                [probability] + [probability.clone() for _ in range(self.beam_width)]
             )
             beams = self._beam_step_per_sequence(probability_beams, beams)
         sequences, scores = zip(*beams)
@@ -262,14 +243,19 @@ class BeamSearch(Search):
         probabilities = torch.softmax(logits.div(self.temperature), 2)
         updated_beams = [
             self._beam_step_per_sequence(sample_probability, sample_beams)
-            for sample_probability, sample_beams in
-            zip(probabilities.permute(1, 0, 2), beams)
+            for sample_probability, sample_beams in zip(
+                probabilities.permute(1, 0, 2), beams
+            )
         ]
-        token_beams = torch.stack(
-            [
-                # get last token for each beam
-                torch.tensor([beam[0][-1] for beam in sample_beams])
-                for sample_beams in updated_beams
-            ]
-        ).permute(1, 0).to(self.device)
+        token_beams = (
+            torch.stack(
+                [
+                    # get last token for each beam
+                    torch.tensor([beam[0][-1] for beam in sample_beams])
+                    for sample_beams in updated_beams
+                ]
+            )
+            .permute(1, 0)
+            .to(self.device)
+        )
         return (token_beams, updated_beams)
