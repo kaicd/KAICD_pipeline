@@ -57,12 +57,7 @@ with open(args.params_filepath) as f:
 smiles_language = SMILESLanguage.load(
     args.project_filepath + args.smiles_language_filepath
 )
-# params.update(
-#     {
-#         "vocab_size": smiles_language.number_of_tokens,
-#         "pad_index": smiles_language.padding_index,
-#     }
-# )
+
 vocab_dict = smiles_language.index_to_token
 params.update(
     {
@@ -76,12 +71,14 @@ params.update(
 if params.get("embedding", "learned") == "one_hot":
     params.update({"embedding_size": params["vocab_size"]})
 
+# Parameter save
 with open(args.params_filepath, "w") as f:
     json.dump(params, f)
 
 # Define dataset and model
 net = ChemVAE(**vars(args))
-data = SELFIES_VAE_lightning(device=net.device, **vars(args))
+print(net.device)
+data = SELFIES_VAE_lightning(**vars(args))
 
 # Define pytorch-lightning Trainer multiple callbacks
 on_best_loss = ModelCheckpoint(
@@ -102,6 +99,7 @@ on_best_kl_div = ModelCheckpoint(
 # Define pytorch-lightning Trainer
 trainer = pl.Trainer.from_argparse_args(
     args,
+    max_epochs=params.get("epochs, 100"),
     logger=loggers.WandbLogger(
         entity=args.entity, project=args.project, log_model=True
     ),

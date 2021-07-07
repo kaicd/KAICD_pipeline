@@ -26,9 +26,8 @@ from pytoda.files import read_smi
 
 logger = logging.getLogger(__name__)
 
-
 def get_device():
-    return torch.device("cuda" if cuda() else "cpu")
+    return torch.device('cuda' if cuda() else 'cpu')
 
 
 def cuda():

@@ -33,7 +33,7 @@ parser.add_argument(
 
 # Trainer args
 parser = pl.Trainer.add_argparse_args(parser)
-parser.set_defaults(gpus=1, accelerator="ddp", max_epochs=50)
+parser.set_defaults(gpus=1, accelerator="ddp", max_epochs=100)
 
 # Dataset args
 parser = Protein_VAE_lightning.add_argparse_args(parser)

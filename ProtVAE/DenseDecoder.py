@@ -3,14 +3,12 @@ import torch.nn.functional as F
 import torch
 from Utility.hyperparams import ACTIVATION_FN_FACTORY
 
-
 class DenseDecoder(nn.Module):
     """
     This meta decoder defines loading, saving and related operations which
     should be shared across all decoder.
     Hence, all other decoder should inherit from this meta decoder.
     """
-
     """Stacking dense layers for decoding."""
 
     def __init__(self, params, *args, **kwargs):
@@ -34,14 +32,15 @@ class DenseDecoder(nn.Module):
         """
         super(DenseDecoder, self).__init__()
 
-        self.hidden_sizes = params["hidden_sizes_decoder"]
-        self.latent_size = params["latent_size"]
-        self.output_size = params["input_size"]
-        self.activation_fn = ACTIVATION_FN_FACTORY[params.get("activation_fn", "relu")]
+        self.hidden_sizes = params['hidden_sizes_decoder']
+        self.latent_size = params['latent_size']
+        self.output_size = params['input_size']
+        self.activation_fn = ACTIVATION_FN_FACTORY[
+            params.get('activation_fn', 'relu')]
         self.dropout = (
-            [params.get("dropout", 0.0)] * len(self.hidden_sizes)
-            if isinstance(params.get("dropout", 0.0), float)
-            else params.get("dropout", 0.0)
+            [params.get('dropout', 0.0)] * len(self.hidden_sizes)
+            if isinstance(params.get('dropout', 0.0), float) else
+            params.get('dropout', 0.0)
         )
         self.params = params
         self._assertion_tests()
@@ -51,7 +50,7 @@ class DenseDecoder(nn.Module):
         ops = []
         for index in range(1, len(num_units) - 1):
             ops.append(nn.Linear(num_units[index - 1], num_units[index]))
-            if params.get("batch_norm", True):
+            if params.get('batch_norm', True):
                 ops.append(nn.BatchNorm1d(num_units[index]))
             ops.append(self.activation_fn)
             if self.dropout[index - 1] > 0.0:
@@ -59,7 +58,7 @@ class DenseDecoder(nn.Module):
         # Last layer does not use dropout and
         # may require sigmoidal if data is normalized.
         ops.append(nn.Linear(num_units[-2], num_units[-1]))
-        if self.params.get("input_normalized", False):
+        if self.params.get('input_normalized', False):
             ops.append(F.sigmoid)
 
         self.decoding = nn.Sequential(*ops)
@@ -72,31 +71,17 @@ class DenseDecoder(nn.Module):
         Returns:
             torch.Tensor: the reconstructed input obtained through the decoder.
         """
-
         return self.decoding(latent_z)
 
     def _assertion_tests(self):
         """Checks size issues.
         Hidden sizes should be monotonic data expansions.
         """
-
         assert self.hidden_sizes == sorted(
             self.hidden_sizes
         ), "Hidden sizes not monotonic."
-
-        assert (
-            self.latent_size < self.hidden_sizes[0]
-        ), "First hidden size no expansion."
-
+        assert self.latent_size < self.hidden_sizes[
+            0], "First hidden size no expansion."
         assert len(self.dropout) == len(
             self.hidden_sizes
         ), "Unequal dropout/hidden lengths."
-
-    def load(self, path, *args, **kwargs):
-        """Load model from path."""
-        weights = torch.load(path, *args, **kwargs)
-        self.load_state_dict(weights)
-
-    def save(self, path, *args, **kwargs):
-        """Save model to path."""
-        torch.save(self.state_dict(), path, *args, **kwargs)

@@ -25,8 +25,8 @@
     "kld_loss": "kld",
     "alpha": 0.5,
     "beta": 1.0,
-    "kl_annealing": 300,
+    "kl_annealing": 30,
     "save_model": 250,
-    "epochs": 2000,
+    "epochs": 100,
     "batch_size": 8192
 }

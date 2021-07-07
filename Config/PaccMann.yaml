@@ -2,7 +2,7 @@ wandb:
   entity: "kaicd"
   project: "PaccMann_sarscov2_Pipeline_Test"
 
-model: "Toxicity"
+model: "ChemVAE"
 
 DTI_filepath:
   project_filepath: "/raid/PaccMann_sarscov2/"
@@ -30,8 +30,8 @@ ChemVAE_filepath:
   save_filepath: "/raid/PaccMann_sarscov2/paccmann_chemistry/checkpoint/"
   smiles_language_filepath: "data/pretraining/language_models/selfies_language.pkl"
   params_filepath: "Config/selfies.json"
-  train_affinity_filepath: "data/pretraining/SELFIESVAE/train_chembl_22_clean_1576904_sorted_std_final.smi"
-  test_affinity_filepath: "data/pretraining/SELFIESVAE/test_chembl_22_clean_1576904_sorted_std_final.smi"
+  train_smiles_filepath: "data/pretraining/SELFIESVAE/train_chembl_22_clean_1576904_sorted_std_final.smi"
+  test_smiles_filepath: "data/pretraining/SELFIESVAE/test_chembl_22_clean_1576904_sorted_std_final.smi"
 
 ProtVAE_filepath:
   project_filepath: "/raid/PaccMann_sarscov2/"

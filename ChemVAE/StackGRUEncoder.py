@@ -3,8 +3,6 @@ import torch
 import torch.nn as nn
 
 from Utility import utils
-from Utility.hyperparams import OPTIMIZER_FACTORY
-from Utility.search import BeamSearch, SamplingSearch
 from StackGRU import StackGRU
 
 
@@ -53,32 +51,6 @@ class StackGRUEncoder(StackGRU):
             in_features=self.rnn_cell_size * self.n_directions,
             out_features=self.latent_dim,
         )
-
-    def encoder_train_step(self, input_seq):
-        """
-        The Encoder Train Step.
-        Args:
-            input_seq (torch.Tensor): the sequence of indices for the input
-            of shape `[max batch sequence length +1, batch_size]`, where +1 is
-            for the added start_index.
-        Note: Input_seq is an output of sequential_data_preparation(batch) with
-            batches returned by a DataLoader object.
-        Returns:
-            (torch.Tensor, torch.Tensor): mu, logvar
-            mu is the latent mean of shape `[1, batch_size, latent_dim]`.
-            logvar is the log of the latent variance of shape
-                `[1, batch_size, latent_dim]`.
-        """
-        # Forward pass
-        hidden = self.init_hidden
-        stack = self.init_stack
-
-        hidden = self._forward_fn(input_seq, hidden, stack)
-
-        mu = self.hidden_to_mu(hidden)
-        logvar = self.hidden_to_logvar(hidden)
-
-        return mu, logvar
 
     def _forward_pass_padded(self, input_seq, hidden, stack):
         """
@@ -165,10 +137,7 @@ class StackGRUEncoder(StackGRU):
         left_dims = hidden.shape[1]
         final_hidden[:, :left_dims, :] = hidden[:, :left_dims, :]
         final_stack[:left_dims, :, :] = stack[:left_dims, :, :]
-
-        hidden = final_hidden
-        stack = final_stack
-        hidden = self._post_gru_reshape(hidden)
+        hidden = self._post_gru_reshape(final_hidden)
 
         # Backward pass:
         if self.bidirectional:
@@ -224,5 +193,4 @@ class StackGRUEncoder(StackGRU):
 
         # Layers x Batch x Cell_size ->  B x C
         hidden = hidden[-1, :, :]
-
         return hidden

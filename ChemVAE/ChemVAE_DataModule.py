@@ -2,6 +2,7 @@ import json
 import dill
 import os.path as osp
 from argparse import ArgumentParser
+
 import pytorch_lightning as pl
 from typing import Optional, Union, Dict, List
 from pytoda.datasets import SMILESDataset
@@ -12,7 +13,7 @@ from torch.utils.data.dataloader import DataLoader
 class SELFIES_VAE_lightning(pl.LightningDataModule):
     @classmethod
     def add_argparse_args(
-        cls, parent_parser: ArgumentParser, **kwargs
+            cls, parent_parser: ArgumentParser, **kwargs
     ) -> ArgumentParser:
         parser = parent_parser.add_argument_group(cls.__name__)
         parser.add_argument(
@@ -37,7 +38,6 @@ class SELFIES_VAE_lightning(pl.LightningDataModule):
         test_smiles_filepath,
         smiles_language_filepath,
         params_filepath,
-        device,
         *args,
         **kwargs,
     ):
@@ -49,7 +49,6 @@ class SELFIES_VAE_lightning(pl.LightningDataModule):
         self.params_filepath = params_filepath
         self.smiles_language = SMILESLanguage.load(self.smiles_language_filepath)
         self.params = {}
-        self.device = device
 
         # Process parameter file
         with open(self.params_filepath) as f:
@@ -85,7 +84,6 @@ class SELFIES_VAE_lightning(pl.LightningDataModule):
                     remove_bonddir=self.params.get("remove_bonddir", False),
                     remove_chirality=self.params.get("remove_chirality", False),
                     backend="lazy",
-                    device=self.device,
                 )
                 if i == 0:
                     self.train_dataset = dataset
