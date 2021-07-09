@@ -18,11 +18,10 @@ class SAS(DrugEvaluator):
     score) for a molecule.
     """
 
-    fpscore_file_name = 'fpscores.pkl.gz'
+    fpscore_file_name = "fpscores.pkl.gz"
     fpscore_url = (
-        'https://github.com/rdkit/rdkit/raw/'
-        '4081cb51e5337230240fb9073b6ca4ef903f94a5/Contrib/SA_Score/' +
-        fpscore_file_name
+        "https://github.com/rdkit/rdkit/raw/"
+        "4081cb51e5337230240fb9073b6ca4ef903f94a5/Contrib/SA_Score/" + fpscore_file_name
     )
 
     def __init__(self):
@@ -67,7 +66,7 @@ class SAS(DrugEvaluator):
         # fragment score
         fp = rdMolDescriptors.GetMorganFingerprint(mol, 2)
         fps = fp.GetNonzeroElements()
-        score1 = 0.
+        score1 = 0.0
         nf = 0
         for bitId, v in fps.items():
             nf += v
@@ -77,9 +76,7 @@ class SAS(DrugEvaluator):
 
         # features score
         nAtoms = mol.GetNumAtoms()
-        nChiralCenters = len(
-            Chem.FindMolChiralCenters(mol, includeUnassigned=True)
-        )
+        nChiralCenters = len(Chem.FindMolChiralCenters(mol, includeUnassigned=True))
         ri = mol.GetRingInfo()
         nBridgeheads, nSpiro = self.numBridgeheadsAndSpiro(mol, ri)
         nMacrocycles = 0
@@ -87,11 +84,11 @@ class SAS(DrugEvaluator):
             if len(x) > 8:
                 nMacrocycles += 1
 
-        sizePenalty = nAtoms**1.005 - nAtoms
+        sizePenalty = nAtoms ** 1.005 - nAtoms
         stereoPenalty = math.log10(nChiralCenters + 1)
         spiroPenalty = math.log10(nSpiro + 1)
         bridgePenalty = math.log10(nBridgeheads + 1)
-        macrocyclePenalty = 0.
+        macrocyclePenalty = 0.0
         # ---------------------------------------
         # This differs from the paper, which defines:
         #  macrocyclePenalty = math.log10(nMacrocycles+1)
@@ -99,27 +96,34 @@ class SAS(DrugEvaluator):
         if nMacrocycles > 0:
             macrocyclePenalty = math.log10(2)
 
-        score2 = 0. - sizePenalty - stereoPenalty - spiroPenalty - bridgePenalty - macrocyclePenalty
+        score2 = (
+            0.0
+            - sizePenalty
+            - stereoPenalty
+            - spiroPenalty
+            - bridgePenalty
+            - macrocyclePenalty
+        )
 
         # correction for the fingerprint density
         # not in the original publication, added in version 1.1
         # to make highly symmetrical molecules easier to synthetise
-        score3 = 0.
+        score3 = 0.0
         if nAtoms > len(fps):
-            score3 = math.log(float(nAtoms) / len(fps)) * .5
+            score3 = math.log(float(nAtoms) / len(fps)) * 0.5
 
         sascore = score1 + score2 + score3
 
         # need to transform "raw" value into scale between 1 and 10
         min = -4.0
         max = 2.5
-        sascore = 11. - (sascore - min + 1) / (max - min) * 9.
+        sascore = 11.0 - (sascore - min + 1) / (max - min) * 9.0
         # smooth the 10-end
-        if sascore > 8.:
-            sascore = 8. + math.log(sascore + 1. - 9.)
-        if sascore > 10.:
+        if sascore > 8.0:
+            sascore = 8.0 + math.log(sascore + 1.0 - 9.0)
+        if sascore > 10.0:
             sascore = 10.0
-        elif sascore < 1.:
+        elif sascore < 1.0:
             sascore = 1.0
 
         return sascore

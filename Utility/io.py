@@ -13,7 +13,7 @@ from urllib.request import urlretrieve
 import six
 
 
-def _extract_archive(filepath, path='.', archive_format='auto'):
+def _extract_archive(filepath, path=".", archive_format="auto"):
     """
     Extracts an archive if it matches tar, tar.gz, tar.bz, or zip formats.
     Args:
@@ -30,16 +30,16 @@ def _extract_archive(filepath, path='.', archive_format='auto'):
     """
     if archive_format is None:
         return False
-    if archive_format == 'auto':
-        archive_format = ['tar', 'zip']
+    if archive_format == "auto":
+        archive_format = ["tar", "zip"]
     if isinstance(archive_format, six.string_types):
         archive_format = [archive_format]
 
     for archive_type in archive_format:
-        if archive_type == 'tar':
+        if archive_type == "tar":
             open_fn = tarfile.open
             is_match_fn = tarfile.is_tarfile
-        if archive_type == 'zip':
+        if archive_type == "zip":
             open_fn = zipfile.ZipFile
             is_match_fn = zipfile.is_zipfile
 
@@ -61,10 +61,10 @@ def _extract_archive(filepath, path='.', archive_format='auto'):
 def get_file(
     filename,
     origin,
-    cache_subdir='cache',
+    cache_subdir="cache",
     extract=False,
-    archive_format='auto',
-    cache_dir=None
+    archive_format="auto",
+    cache_dir=None,
 ):
     """
     Downloads a file from a URL if it not already in the cache.
@@ -93,7 +93,7 @@ def get_file(
         Path to the downloaded file.
     """
     if cache_dir is None:
-        cache_dir = os.path.join('~', '.paccmann')
+        cache_dir = os.path.join("~", ".paccmann")
 
     datadir_base = os.path.expanduser(cache_dir)
     datadir = os.path.join(datadir_base, cache_subdir)
@@ -101,7 +101,7 @@ def get_file(
         try:
             os.makedirs(datadir)
         except Exception:
-            datadir = os.path.join('/tmp', '.paccmann', cache_subdir)
+            datadir = os.path.join("/tmp", ".paccmann", cache_subdir)
             os.makedirs(datadir)
 
     filepath = os.path.join(datadir, filename)
@@ -110,8 +110,8 @@ def get_file(
 
     if download:
 
-        print('Downloading data from', origin)
-        error_msg = 'URL fetch failure on {}: {} -- {}'
+        print("Downloading data from", origin)
+        error_msg = "URL fetch failure on {}: {} -- {}"
         try:
             try:
                 urlretrieve(origin, filepath)

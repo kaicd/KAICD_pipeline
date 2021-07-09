@@ -21,7 +21,7 @@ parser.add_argument(
 parser.add_argument(
     "--save_filepath",
     type=str,
-    default="/raid/PaccMann_sarscov2/paccmann_omics/checkpoint/",
+    default="paccmann_omics/checkpoint/",
 )
 parser.add_argument("--seed", type=int, default=42)
 parser.add_argument(
@@ -46,21 +46,21 @@ data = Protein_VAE_lightning(**vars(args))
 
 # Define pytorch-lightning Trainer multiple callbacks
 on_best_loss = ModelCheckpoint(
-    dirpath=args.save_filepath,
+    dirpath=args.project_filepath + args.save_filepath,
     filename="paccmann_omics_best_loss",
     monitor="val_loss",
     save_top_k=1,
     mode="min",
 )
 on_best_rec = ModelCheckpoint(
-    dirpath=args.save_filepath,
+    dirpath=args.project_filepath + args.save_filepath,
     filename="paccmann_omics_best_rec",
     monitor="val_rec",
     save_top_k=1,
     mode="min",
 )
 on_best_kld = ModelCheckpoint(
-    dirpath=args.save_filepath,
+    dirpath=args.project_filepath + args.save_filepath,
     filename="paccmann_omics_best_kld",
     monitor="val_kld",
     save_top_k=1,

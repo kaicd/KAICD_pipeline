@@ -8,6 +8,7 @@ from math import ceil, cos, sin
 
 import numpy as np
 import pandas as pd
+from PIL import Image as pilimg
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -17,6 +18,7 @@ from torch.autograd import Variable
 from torch.distributions.normal import Normal
 from torch.distributions.bernoulli import Bernoulli
 from torch.utils.data.dataset import Dataset
+from rdkit.Chem import Draw
 import rdkit.rdBase as rkrb
 import rdkit.RDLogger as rkl
 import pytoda
@@ -25,14 +27,6 @@ from pytoda.files import read_smi
 
 
 logger = logging.getLogger(__name__)
-
-
-def get_device():
-    return torch.device("cuda" if cuda() else "cpu")
-
-
-def cuda():
-    return torch.cuda.is_available()
 
 
 def sequential_data_preparation(
@@ -543,7 +537,9 @@ def plot_and_compare_proteins(
     plt.xlim([0.0, 1.0])
     plt.savefig(
         os.path.join(
-            save_path, f"results/{mode}_{protein}_epoch_{epoch}_eff_{biased_ratio}.png"
+            save_path,
+            "binding_images",
+            f"{mode}_{protein}_epoch_{epoch}_eff_{biased_ratio}.png",
         )
     )
     plt.clf()

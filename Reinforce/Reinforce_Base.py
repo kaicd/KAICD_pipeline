@@ -1,7 +1,11 @@
 """PaccMann^RL: Policy gradient class"""
 import json
 import os
+import argparse
+
 import torch as th
+import pandas as pd
+import numpy as np
 import pytorch_lightning as pl
 from rdkit import Chem
 from pytoda.transforms import LeftPadding, ToTensor
@@ -59,7 +63,7 @@ class Reinforce_base(pl.LightningModule):
             "--params_path",
             type=str,
             help="Model params json file directory",
-            default="Utility/conditional_generator.json",
+            default="Config/conditional_generator.json",
         )
         parser.add_argument(
             "--unbiased_predictions_path",
@@ -71,7 +75,7 @@ class Reinforce_base(pl.LightningModule):
             "--fig_save_path",
             type=str,
             help="Path to save result figure.",
-            default="binding_images/",
+            default="binding_images/results/",
         )
         parser.add_argument(
             "--tox21_path",
@@ -120,6 +124,7 @@ class Reinforce_base(pl.LightningModule):
     ):
         super(Reinforce_base, self).__init__()
         # Default setting
+        self.project_path = project_path
         self.fig_save_path = project_path + fig_save_path
         # Read the parameters json file
         self.params = dict()
@@ -128,19 +133,10 @@ class Reinforce_base(pl.LightningModule):
         # Set basic parameters
         self.epochs = self.params.get("epochs", 100)
         self.lr = self.params.get("learning_rate", 5e-06)
-        self.opt_fn = OPTIMIZER_FACTORY[params.get("optimizer", "Adam")]
+        self.opt_fn = OPTIMIZER_FACTORY[self.params.get("optimizer", "Adam")]
         self.batch_size = self.params.get("batch_size", 128)
         self.generate_len = self.params.get("generate_len", 100)
         self.temperature = self.params.get("temperature", 1.4)
-        # Set padding parameters
-        self.pad_smiles_predictor = LeftPadding(
-            self.predictor.smiles_padding_length,
-            self.predictor.smiles_language.padding_index,
-        )
-        self.pad_protein_predictor = LeftPadding(
-            self.predictor.protein_padding_length,
-            self.predictor.protein_language.padding_index,
-        )
         # Passing optional paths to params to possibly update_reward_fn
         optional_rewards = [
             (tox21_path, "tox21_path"),
@@ -153,21 +149,22 @@ class Reinforce_base(pl.LightningModule):
             if args:
                 # json still has presedence
                 self.params[kwargs] = project_path + args
-        # Update additional parameters
-        self.update_params(self.params)
         # Restore ProtVAE model
         protein_model = ProtVAE.load_from_checkpoint(
             os.path.join(
                 project_path + protein_model_path, "paccmann_omics_best_loss-v2.ckpt"
-            )
+            ),
+            params_filepath="Config/omics.json",
         )
         self.encoder = protein_model.encoder
-        self.encoder.eval()
         # Restore ChemVAE model (only use decoder)
         chemistry_model = ChemVAE.load_from_checkpoint(
             os.path.join(
                 project_path + mol_model_path, "paccmann_chemistry_best_loss-v2.ckpt"
-            )
+            ),
+            project_filepath=project_path,
+            params_filepath="Config/selfies.json",
+            smiles_language_filepath="language/selfies_language.pkl",
         )
         self.decoder = chemistry_model.decoder
         # Load smiles languages for decoder
@@ -179,9 +176,9 @@ class Reinforce_base(pl.LightningModule):
         self.predictor = BimodalMCA_lightning.load_from_checkpoint(
             os.path.join(
                 project_path + affinity_model_path, "paccmann_predictor_best_loss.ckpt"
-            )
+            ),
+            params_filepath="Config/affinity.json",
         )
-        self.predictor.eval()
         # Load smiles and protein languages for predictor
         predictor_smiles_language = SMILESLanguage.load(
             os.path.join(project_path, "language/smiles_language.pkl")
@@ -189,8 +186,17 @@ class Reinforce_base(pl.LightningModule):
         predictor_protein_language = ProteinLanguage.load(
             os.path.join(project_path, "language/protein_language.pkl")
         )
-        predictor._associate_language(predictor_smiles_language)
-        predictor._associate_language(predictor_protein_language)
+        self.predictor._associate_language(predictor_smiles_language)
+        self.predictor._associate_language(predictor_protein_language)
+        # Set padding parameters
+        self.pad_smiles_predictor = LeftPadding(
+            self.predictor.smiles_padding_length,
+            self.predictor.smiles_language.padding_index,
+        )
+        self.pad_protein_predictor = LeftPadding(
+            self.predictor.protein_padding_length,
+            self.predictor.protein_language.padding_index,
+        )
         # Load protein sequence data for protein test name
         protein_dataset = ProteinDataset(
             project_path + protein_data_path, test_protein_id
@@ -208,7 +214,18 @@ class Reinforce_base(pl.LightningModule):
         )
 
     def forward(self, protein_name):
-        return NotImplementedError
+        # Set evaluate mode for encoder, predictor and drug evaluator
+        self.encoder.eval()
+        self.predictor.eval()
+        drug_evaluator = [
+            self.tox21,
+            self.organdb,
+            self.clintox,
+            self.sider,
+        ]
+        for evaluator in drug_evaluator:
+            if evaluator is not None:
+                evaluator.model.eval()
 
     def training_step(self, batch, *args, **kwargs):
         return NotImplementedError
@@ -248,29 +265,57 @@ class Reinforce_base(pl.LightningModule):
         self.tox21_weight = params.get("tox21_weight", 0.5)
         if self.tox21_weight > 0.0:
             self.tox21 = Tox21(
-                params.get("tox21_path", os.path.join("..", "data", "models", "Tox21"))
+                project_path=self.project_path,
+                params_path="Config/toxsmi.json",
+                model_path=params.get(
+                    "tox21_path", os.path.join("..", "data", "models", "Tox21")
+                )
+                + "paccmann_toxsmi_best_loss-v3.ckpt",
+                device=self.device,
             )
+            self.tox21.model.to(self.device)
+        else:
+            self.tox21 = None
         self.organdb_weight = params.get("organdb_weight", 0.0)
         if self.organdb_weight > 0.0:
             self.organdb = OrganDB(
-                params.get(
+                self.project_path,
+                params_path="Config/toxsmi.json",
+                model_path=params.get(
                     "organdb_path", os.path.join("..", "data", "models", "OrganDB")
                 ),
-                params["site"],
+                site=params["site"],
+                device=self.device,
             )
+            self.organdb.model.to(self.device)
+        else:
+            self.organdb = None
         self.clintox_weight = params.get("clintox_weight", 0.0)
         if self.clintox_weight > 0.0:
             self.clintox = ClinTox(
-                params.get(
+                project_path=self.project_path,
+                params_path="Config/toxsmi.json",
+                model_path=params.get(
                     "clintox_path", os.path.join("..", "data", "models", "ClinTox")
-                )
+                ),
+                device=self.device,
             )
-
+            self.clintox.model.to(self.device)
+        else:
+            self.clintox = None
         self.sider_weight = params.get("sider_weight", 0.0)
         if self.sider_weight > 0.0:
             self.sider = SIDER(
-                params.get("sider_path", os.path.join("..", "data", "models", "Siders"))
+                self.project_path,
+                params_path="Config/toxsmi.json",
+                model_path=params.get(
+                    "sider_path", os.path.join("..", "data", "models", "Siders")
+                ),
+                device=self.device,
             )
+            self.sider.model.to(self.device)
+        else:
+            self.sider = None
         self.affinity_weight = params.get("affinity_weight", 1.0)
 
         def tox_f(s):
@@ -289,7 +334,7 @@ class Reinforce_base(pl.LightningModule):
         # inside the range [0, 1].
         self.reward_fn = lambda smiles, protein: (
             self.affinity_weight * self.get_reward_affinity(smiles, protein)
-            + np.array([tox_f(s) for s in smiles])
+            + th.Tensor([tox_f(s) for s in smiles]).to(self.device)
         )
         # discount factor
         self.gamma = params.get("gamma", 0.99)
@@ -319,10 +364,10 @@ class Reinforce_base(pl.LightningModule):
             protein_mu, protein_logvar = self.encoder(protein_tensor)
 
             latent_z = th.unsqueeze(
-                self.reparameterize(
-                    protein_mu.repeat(batch_size, 1),
-                    protein_logvar.repeat(batch_size, 1),
-                ),
+                # Reparameterize
+                th.randn_like(protein_mu.repeat(batch_size, 1))
+                .mul_(th.exp(0.5 * protein_logvar.repeat(batch_size, 1)))
+                .add_(protein_mu.repeat(batch_size, 1)),
                 0,
             )
         latent_z = latent_z.to(self.device)
@@ -399,7 +444,9 @@ class Reinforce_base(pl.LightningModule):
             # Column names of DF
             locations = [str(x) for x in range(768)]
             protein_encoding = self.protein_df.loc[protein][locations]
-            encoding_tensor = th.unsqueeze(th.Tensor(protein_encoding), 0).to(self.device)
+            encoding_tensor = th.unsqueeze(th.Tensor(protein_encoding), 0).to(
+                self.device
+            )
         t1 = sequence_tensor_e if encoder_uses_sequence else encoding_tensor
         t2 = sequence_tensor_p if predictor_uses_sequence else encoding_tensor
         return t1, t2
@@ -415,25 +462,29 @@ class Reinforce_base(pl.LightningModule):
         Returns:
             tuple(list, list): SMILES and numericals.
         """
-        if self.generator.decoder.latent_dim == 2 * self.encoder.latent_size:
+        if self.decoder.latent_dim == 2 * self.encoder.latent_size:
             latent = latent.repeat(1, 1, 2)
-        mols_numerical = self.generator.generate(
+        mols_numerical = self.decoder.generate(
             latent,
-            prime_input=th.Tensor([self.generator.smiles_language.start_index]).long().to(self.device),
-            end_token=th.Tensor([self.generator.smiles_language.stop_index]).long().to(self.device),
+            prime_input=th.Tensor([self.decoder.smiles_language.start_index])
+            .long()
+            .to(self.device),
+            end_token=th.Tensor([self.decoder.smiles_language.stop_index])
+            .long()
+            .to(self.device),
             generate_len=self.generate_len,
             search=SamplingSearch(temperature=self.temperature),
         )
         # Retrieve SMILES from numericals
         smiles_num_tuple = [
             (
-                self.generator.smiles_language.token_indexes_to_smiles(
-                    mol_num.tolist()
-                ),
+                self.decoder.smiles_language.token_indexes_to_smiles(mol_num.tolist()),
                 th.cat(
                     [
-                        mol_num.long(),
-                        th.tensor(2 * [self.generator.smiles_language.stop_index]).to(self.device),
+                        mol_num.long().to(self.device),
+                        th.tensor(2 * [self.decoder.smiles_language.stop_index]).to(
+                            self.device
+                        ),
                     ]
                 ).to(self.device),
             )
@@ -443,7 +494,7 @@ class Reinforce_base(pl.LightningModule):
 
         # NOTE: If SMILES is used instead of SELFIES this line needs adjustment
         smiles = [
-            self.generator.smiles_language.selfies_to_smiles(sm[0])
+            self.decoder.smiles_language.selfies_to_smiles(sm[0])
             for sm in smiles_num_tuple
         ]
         imgs = [
@@ -463,9 +514,9 @@ class Reinforce_base(pl.LightningModule):
             for ind in range(len(numericals))
             if not (remove_invalid and imgs[ind] is None)
         ]
-        self.logger.info(
-            f"{self.model_name}: SMILES validity: "
-            f"{(len([i for i in imgs if i is not None]) / len(imgs)) * 100:.2f}%."
+        self.log(
+            "SMILES validity (%)",
+            (len([i for i in imgs if i is not None]) / len(imgs)) * 100,
         )
         return smiles, nums, valid_idxs
 
@@ -493,7 +544,7 @@ class Reinforce_base(pl.LightningModule):
             raise ValueError("Drug priming not yet supported.")
         if protein is None:
             # Generate a random molecule
-            latent_z = th.randn(1, batch_size, self.generator.decoder.latent_dim)
+            latent_z = th.randn(1, batch_size, self.decoder.latent_dim)
         else:
             (
                 protein_encoder_tensor,
@@ -545,7 +596,7 @@ class Reinforce_base(pl.LightningModule):
         # inside the range [0, 1].
         self.reward_fn = lambda smiles, protein: (
             self.affinity_weight * self.get_reward_affinity(smiles, protein)
-            + np.array([tox_f(s) for s in smiles])
+            + th.Tensor([tox_f(s) for s in smiles]).to(self.device)
         )
 
     def get_reward_affinity(self, valid_smiles, protein):

@@ -5,6 +5,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
+from pytoda.smiles import SMILESLanguage
 
 
 logger = logging.getLogger("stack_gru")

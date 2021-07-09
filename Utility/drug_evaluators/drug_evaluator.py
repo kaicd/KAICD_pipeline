@@ -25,32 +25,29 @@ class DrugEvaluator:
     """
 
     def __init__(self):
-        self.device = get_device()
+        pass
 
     def __call__(self, smiles: str):
 
         raise NotImplementedError
 
-    def load_mca(self, model_path: str):
+    def load_mca(self, project_path: str, params_path: str, model_path: str):
         """
         Restores pretrained MCA
 
         Arguments:
             model_path {String} -- Path to the model
         """
-
-        # Load model parameters
-        self.model_path = model_path
-        with open(os.path.join(model_path, "model_params.json")) as f:
+        with open(params_path) as f:
             params = json.load(f)
         # Set up language and transforms
         self.smiles_language = SMILESLanguage.load(
-            os.path.join(model_path, "smiles_language.pkl")
+            os.path.join(project_path, "language", "smiles_language.pkl")
         )
         self.transforms = self.compose_smiles_transforms(params)
         # Initialize and restore model weights
         self.model = MCA_lightning.load_from_checkpoint(
-            os.path.join(model_path, "paccmann_toxsmi_best_loss-v2.ckpt")
+            os.path.join(project_path, model_path), params_filepath=params_path
         )
         self.model.eval()
 
@@ -102,7 +99,6 @@ class DrugEvaluator:
 
         transforms += [SMILESToTokenIndexes(smiles_language=self.smiles_language)]
         transforms += [ToTensor(device=self.device)]
-
         return Compose(transforms)
 
     def preprocess_smiles(self, smiles: str) -> th.Tensor:

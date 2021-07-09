@@ -52,8 +52,8 @@ class AromaticRing(DrugEvaluator):
                     has_ring = True
                 if has_ring:
                     break
-            return 1. if has_ring else 0.
+            return 1.0 if has_ring else 0.0
 
         except Exception:
-            logger.warn(f'Error in computing ring information for {mol}')
-            return 0.
+            logger.warn(f"Error in computing ring information for {mol}")
+            return 0.0

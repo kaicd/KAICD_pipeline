@@ -40,7 +40,6 @@ class MCA_lightning(pl.LightningModule):
 
     def __init__(
         self,
-        project_filepath,
         params_filepath,
         **kwargs,
     ):
@@ -114,7 +113,7 @@ class MCA_lightning(pl.LightningModule):
         self.hidden_sizes = [
             self.multiheads[0] * params["smiles_embedding_size"]
             + sum([h * f for h, f in zip(self.multiheads[1:], self.filters)])
-        ] + params.get("stacked_hidden_sizes", [1024, 512])
+        ] + params.get("stacked_dense_hidden_sizes", [1024, 512])
 
         self.dropout = params.get("dropout", 0.5)
         self.use_batch_norm = params.get("batch_norm", True)
@@ -180,7 +179,7 @@ class MCA_lightning(pl.LightningModule):
                             act_fn=self.act_fn,
                             dropout=self.dropout,
                             batch_norm=self.use_batch_norm,
-                        ).to(self.device),
+                        ),
                     )
                     for index, (num_kernel, kernel_size) in enumerate(
                         zip(self.filters, self.kernel_sizes)
@@ -231,7 +230,7 @@ class MCA_lightning(pl.LightningModule):
                             act_fn=self.act_fn,
                             dropout=self.dropout,
                             batch_norm=self.use_batch_norm,
-                        ).to(self.device),
+                        ),
                     )
                     for ind in range(len(self.hidden_sizes) - 1)
                 ]
@@ -268,9 +267,7 @@ class MCA_lightning(pl.LightningModule):
             predictions are toxicity predictions of shape `[bs, num_tasks]`.
             prediction_dict includes the prediction and attention weights.
         """
-
         embedded_smiles = self.smiles_embedding(smiles.to(dtype=th.int64))
-
         # SMILES Convolutions. Unsqueeze has shape batch_size x 1 x T x H.
         encoded_smiles = [embedded_smiles] + [
             self.convolutional_layers[ind](th.unsqueeze(embedded_smiles, 1)).permute(

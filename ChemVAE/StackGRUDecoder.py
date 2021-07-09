@@ -3,11 +3,10 @@ from itertools import takewhile
 
 import torch as th
 import torch.nn as nn
-from torch.autograd import Variable
 
 from Utility import utils
 from Utility.search import BeamSearch, SamplingSearch
-from StackGRU import StackGRU
+from .StackGRU import StackGRU
 
 
 class StackGRUDecoder(StackGRU):

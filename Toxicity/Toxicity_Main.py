@@ -53,7 +53,7 @@ pl.seed_everything(args.seed)
 params = {}
 with open(args.params_filepath) as f:
     params.update(json.load(f))
-if params["embedding"] == "pretrained":
+if params.get("embedding", "learned") == "pretrained":
     params.update({"embedding_path": args.project_filepath + args.embedding_path})
     with open(args.params_filepath, "w") as f:
         json.dump(params, f)

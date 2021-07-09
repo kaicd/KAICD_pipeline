@@ -107,7 +107,9 @@ on_best_avg_precision_score = ModelCheckpoint(
 trainer = pl.Trainer.from_argparse_args(
     args,
     logger=loggers.WandbLogger(
-        entity=args.entity, project=args.project, log_model=True
+        entity=args.entity,
+        project=args.project,
+        log_model=True,
     ),
     callbacks=[on_best_loss, on_best_roc_auc, on_best_avg_precision_score],
 )

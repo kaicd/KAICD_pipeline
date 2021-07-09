@@ -39,7 +39,6 @@ class BimodalMCA_lightning(pl.LightningModule):
 
     def __init__(
         self,
-        project_filepath,
         params_filepath,
         **kwargs,
     ):
@@ -95,13 +94,12 @@ class BimodalMCA_lightning(pl.LightningModule):
         """
 
         super(BimodalMCA_lightning, self).__init__()
-        self.params_filepath = params_filepath
-
         # Model Parameter
         params = {}
-        with open(self.params_filepath) as f:
+        with open(params_filepath) as f:
             params.update(json.load(f))
 
+        self.params = params
         self.lr = params.get("lr", 0.001)
         self.epochs = params["epochs"]
         self.smiles_padding_length = params["smiles_padding_length"]

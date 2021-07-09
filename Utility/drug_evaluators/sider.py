@@ -12,7 +12,9 @@ class SIDER(DrugEvaluator):
     Model predicts 27 classes
     """
 
-    def __init__(self, model_path: str):
+    def __init__(
+        self, project_path: str, params_path: str, model_path: str, device: torch.device
+    ):
         """
 
         Arguments:
@@ -20,7 +22,8 @@ class SIDER(DrugEvaluator):
         """
 
         super(SIDER, self).__init__()
-        self.load_mca(model_path)
+        self.device = device
+        self.load_mca(project_path, params_path, model_path)
 
     def __call__(self, smiles: str) -> float:
         """
@@ -35,7 +38,7 @@ class SIDER(DrugEvaluator):
         """
         # Error handling.
         if not type(smiles) == str:
-            raise TypeError(f'Input must be String, not :{type(smiles)}')
+            raise TypeError(f"Input must be String, not :{type(smiles)}")
 
         smiles_tensor = self.preprocess_smiles(smiles)
         return self.sider_score(smiles_tensor)
@@ -56,4 +59,4 @@ class SIDER(DrugEvaluator):
         # To allow accessing the raw predictions from outside
         self.predictions = predictions[0, :]
 
-        return 1. - float(self.predictions.mean())
+        return 1.0 - float(self.predictions.mean())

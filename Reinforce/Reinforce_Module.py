@@ -25,13 +25,15 @@ class Reinforce(Reinforce_base):
         # Define for save result(good molecules!) in dataframe
         self.biased_ratios, self.tox_ratios = [], []
         self.rewards, self.rl_losses = [], []
-        self.gen_mols, self.gen_prot, self.gen_affinity = [], [], []
+        self.gen_mols, self.gen_prot, self.gen_affinity, self.toxes = [], [], [], []
+        self.non_toxic_useful_smiles, self.non_toxic_useful_preds = [], []
 
     """
     Implementation of the policy gradient algorithm.
     """
 
     def forward(self, protein_name):
+        super().forward(protein_name)
         # Encode the protein
         latent_z = self.encode_protein(protein_name, self.batch_size)
         # Produce molecules
@@ -39,37 +41,38 @@ class Reinforce(Reinforce_base):
             latent_z, remove_invalid=True
         )
         # Get rewards (list, one reward for each valid smiles)
-        rewards = self.reward_fn(valid_smiles, protein)
+        rewards = self.reward_fn(valid_smiles, protein_name)
         # valid_nums is a list of torch.Tensor, each with varying length,
         padded_nums = th.nn.utils.rnn.pad_sequence(valid_nums)
         num_mols = padded_nums.shape[1]
         self.decoder._update_batch_size(num_mols, device=self.device)
         # Batch processing
         lrps = 1
-        if self.generator.decoder.latent_dim == 2 * self.encoder.latent_size:
+        if self.decoder.latent_dim == 2 * self.encoder.latent_size:
             lrps = 2
         hidden = self.decoder.latent_to_hidden(
-            latent_z.repeat(self.generator.decoder.n_layers, 1, lrps)[:, valid_idx, :]
+            latent_z.repeat(self.decoder.n_layers, 1, lrps)[:, valid_idx, :]
         ).to(self.device)
         stack = self.decoder.init_stack.to(self.device)
 
         return padded_nums, hidden, stack, rewards
 
+    def on_train_start(self):
+        self.update_params(self.params)
+
     def training_step(self, batch, *args, **kwargs):
         padded_nums, hidden, stack, rewards = self(batch[0])
-
+        rewards = rewards.detach().cpu()
         rl_loss = 0
         for p in range(len(padded_nums) - 1):
             output, hidden, stack = self.decoder(
                 th.unsqueeze(padded_nums[p], 0), hidden, stack
             )
             output = self.decoder.output_layer(output).squeeze()
-            log_probs = F.softmax(output, dim=1)
+            log_probs = F.log_softmax(output, dim=1)
             target_char = th.unsqueeze(padded_nums[p + 1], 1)
-            rl_loss -= th.mean(
-                log_probs.gather(1, target_char)
-                * th.unsqueeze(th.Tensor(rewards).to(self.device), 1)
-            )
+            reward_tensor = th.unsqueeze(th.Tensor(rewards), 1).to(self.device)
+            rl_loss -= th.mean(log_probs.gather(1, target_char) * reward_tensor)
 
         summed_reward = th.mean(th.Tensor(rewards).to(self.device))
         if self.grad_clipping is not None:
@@ -89,44 +92,47 @@ class Reinforce(Reinforce_base):
         smiles, preds = self.generate_compounds_and_evaluate(
             batch_size=self.batch_size, protein=self.protein_test_name
         )
-        toxes = th.Tensor([self.tox21(s) for s in smiles]).to(self.device)
-        # Filtering (affinity > 0.5)
-        useful_idx = preds > 0.5
-        useful_smiles = smiles[useful_idx]
-        useful_preds = preds[useful_idx]
-        useful_toxes = toxes[useful_idx]
+        preds = preds.detach().cpu().numpy()
+        # Filtering (affinity > 0.5, tox == 1.0)
+        useful_smiles = [s for i, s in enumerate(smiles) if preds[i] > 0.5]
+        useful_preds = preds[preds > 0.5]
         for p, s in zip(useful_preds, useful_smiles):
             self.gen_mols.append(s)
             self.gen_prot.append(self.protein_test_name)
             self.gen_affinity.append(p)
-        # Filtering (tox == 1.0 -> non-toxic)
-        non_toxic_useful_idx = useful_toxes == 1.0
-        non_toxic_useful_smiles = useful_smiles[non_toxic_useful_idx]
-        non_toxic_useful_preds = useful_preds[non_toxic_useful_idx]
+
+            tox = self.tox21(s)
+            self.toxes.append(tox)
+            if tox == 1.0:
+                self.non_toxic_useful_smiles.append(s)
+                self.non_toxic_useful_preds.append(p)
         # Log efficacy and non toxicity ratio
-        biased_ratio = th.round(100 * (th.sum(preds > 0.5) / len(preds)), 1)
+        plot_and_compare_proteins(
+            self.unbiased_preds,
+            preds,
+            self.protein_test_name,
+            self.current_epoch,
+            self.project_path,
+            "train",
+            self.batch_size,
+        )
+        biased_ratio = np.round((np.sum(preds > 0.5) / len(preds)) * 100, 1)
         self.biased_ratios.append(biased_ratio)
-        tox_ratio = th.round(100 * (th.sum(toxes == 1.0) / len(toxes)), 1)
+        all_toxes = np.array([self.tox21(s) for s in smiles])
+        tox_ratio = np.round((np.sum(all_toxes == 1.0) / len(all_toxes)) * 100, 1)
         self.tox_ratios.append(tox_ratio)
         self.log("efficacy_ratio", biased_ratio)
         self.log("non_tox_ratio", tox_ratio)
         # Log distribution plot
-        plot_and_compare_proteins(
-            self.unbiased_preds,
-            preds.detach().cpu().numpy(),
-            self.protein_test_name,
-            self.current_epoch,
-            self.fig_save_path,
-            "train",
-            self.batch_size,
-        )
+
         self.logger.experiment.log(
             {
                 "NAIVE and BIASED binding compounds distribution": [
                     Image(
                         pilimg.open(
                             os.path.join(
-                                self.fig_save_path,
+                                self.project_path,
+                                "binding_images",
                                 f"train_{self.protein_test_name}_epoch_{self.current_epoch}_eff_{biased_ratio}.png",
                             )
                         )
@@ -135,14 +141,14 @@ class Reinforce(Reinforce_base):
             }
         )
         # Log top 4 generate molecule
-        idx = np.argsort(non_toxic_useful_preds)[::-1]
+        idx = np.argsort(self.non_toxic_useful_preds)[::-1]
         lead = []
         captions = []
         for i in idx:
-            mol = Chem.MolFromSmiles(non_toxic_useful_smiles[i])
+            mol = Chem.MolFromSmiles(self.non_toxic_useful_smiles[i])
             if mol:
                 lead.append(mol)
-                captions.append(str(non_toxic_useful_preds[i]))
+                captions.append(str(self.non_toxic_useful_preds[i]))
                 if len(lead) == 4:
                     break
 
@@ -164,5 +170,9 @@ class Reinforce(Reinforce_base):
                 "Tox21": self.toxes,
             }
         )
-        df.to_csv(os.path.join(self.fig_save_path, "results", "generated.csv"))
+        df.to_csv(
+            os.path.join(
+                self.project_path, "results", self.protein_test_name + "_generated.csv"
+            )
+        )
         self.logger.experiment.log(Table(dataframe=df))

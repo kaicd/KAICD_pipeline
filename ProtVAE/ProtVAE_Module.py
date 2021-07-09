@@ -3,8 +3,8 @@ import json
 import torch as th
 import pytorch_lightning as pl
 
-from DenseEncoder import DenseEncoder
-from DenseDecoder import DenseDecoder
+from .DenseEncoder import DenseEncoder
+from .DenseDecoder import DenseDecoder
 from Utility.hyperparams import LOSS_FN_FACTORY
 from Utility.hyperparams import OPTIMIZER_FACTORY
 from Utility.loss_functions import joint_loss
@@ -14,7 +14,7 @@ from Utility.utils import augment
 class ProtVAE(pl.LightningModule):
     """Variational Auto-Encoder (VAE)"""
 
-    def __init__(self, project_filepath, params_filepath, *args, **kwargs):
+    def __init__(self, params_filepath, *args, **kwargs):
         """
         This class specifies a Variational Auto-Encoder (VAE) which
             can be instantiated with different encoder or decoder

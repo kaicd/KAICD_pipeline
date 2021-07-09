@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 
 from Utility import utils
-from StackGRU import StackGRU
+from .StackGRU import StackGRU
 
 
 class StackGRUEncoder(StackGRU):

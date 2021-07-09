@@ -37,7 +37,7 @@ class PenalizedLogP(DrugEvaluator):
             return self.logp(mol) - self.get_num_rings_6(mol) - self.sas(mol)
         # Catch atom valence exception raised by CalcCrippenDescriptor
         except Exception:
-            return 0.
+            return 0.0
 
     @staticmethod
     def get_num_rings_6(mol):

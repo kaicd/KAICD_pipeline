@@ -12,9 +12,15 @@ class ClinTox(DrugEvaluator):
         Second is probability of failure in clinical stage.
     """
 
-    def __init__(self, model_path: str, reward_type: str = 'thresholded'):
+    def __init__(
+        self,
+        project_path: str,
+        params_path: str,
+        model_path: str,
+        device: torch.device,
+        reward_type: str = "thresholded",
+    ):
         """
-
         Arguments:
             model_path {string} -- Path to the pretrained model
 
@@ -26,19 +32,19 @@ class ClinTox(DrugEvaluator):
         """
 
         super(ClinTox, self).__init__()
-        self.load_mca(model_path)
+        self.load_mca(project_path, params_path, model_path)
 
         self.set_reward_fn(reward_type)
 
     def set_reward_fn(self, reward_type: str):
         self.reward_type = reward_type
-        if reward_type == 'thresholded':
-            self.reward_fn = lambda x: (1. if x[0] > .5 and x[1] < .5 else 0.)
-        elif reward_type == 'raw':
+        if reward_type == "thresholded":
+            self.reward_fn = lambda x: (1.0 if x[0] > 0.5 and x[1] < 0.5 else 0.0)
+        elif reward_type == "raw":
             # Average probabilities
             self.reward_fn = lambda x: float((x[0] + 1 - x[1]) / 2)
         else:
-            raise ValueError(f'Unknown reward_type given: {reward_type}')
+            raise ValueError(f"Unknown reward_type given: {reward_type}")
 
     def __call__(self, smiles: str) -> float:
         """
@@ -53,7 +59,7 @@ class ClinTox(DrugEvaluator):
         """
         # Error handling.
         if not type(smiles) == str:
-            raise TypeError(f'Input must be String, not :{type(smiles)}')
+            raise TypeError(f"Input must be String, not :{type(smiles)}")
 
         smiles_tensor = self.preprocess_smiles(smiles)
         return self.clintox_score(smiles_tensor)

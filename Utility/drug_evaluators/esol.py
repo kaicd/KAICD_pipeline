@@ -39,7 +39,7 @@ class ESOL(DrugEvaluator):
         try:
             return self.calc_esol(mol)
         except Exception:
-            return 0.
+            return 0.0
 
     def calc_ap(self, mol):
         """
@@ -73,8 +73,11 @@ class ESOL(DrugEvaluator):
         coef = {"logp": -0.63, "mw": -0.0062, "rotors": 0.066, "ap": -0.74}
         desc = self.calc_esol_descriptors(mol)
         esol = (
-            intercept + coef["logp"] * desc.logp + coef["mw"] * desc.mw +
-            coef["rotors"] * desc.rotors + coef["ap"] * desc.ap
+            intercept
+            + coef["logp"] * desc.logp
+            + coef["mw"] * desc.mw
+            + coef["rotors"] * desc.rotors
+            + coef["ap"] * desc.ap
         )
         return esol
 
@@ -87,14 +90,17 @@ class ESOL(DrugEvaluator):
         """
         intercept = 0.26121066137801696
         coef = {
-            'mw': -0.0066138847738667125,
-            'logp': -0.7416739523408995,
-            'rotors': 0.003451545565957996,
-            'ap': -0.42624840441316975
+            "mw": -0.0066138847738667125,
+            "logp": -0.7416739523408995,
+            "rotors": 0.003451545565957996,
+            "ap": -0.42624840441316975,
         }
         desc = self.calc_esol_descriptors(mol)
         esol = (
-            intercept + coef["logp"] * desc.logp + coef["mw"] * desc.mw +
-            coef["rotors"] * desc.rotors + coef["ap"] * desc.ap
+            intercept
+            + coef["logp"] * desc.logp
+            + coef["mw"] * desc.mw
+            + coef["rotors"] * desc.rotors
+            + coef["ap"] * desc.ap
         )
         return esol

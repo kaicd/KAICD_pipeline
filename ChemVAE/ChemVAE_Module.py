@@ -10,8 +10,8 @@ from Utility.utils import (
     packed_sequential_data_preparation,
     sequential_data_preparation,
 )
-from StackGRUEncoder import StackGRUEncoder
-from StackGRUDecoder import StackGRUDecoder
+from .StackGRUEncoder import StackGRUEncoder
+from .StackGRUDecoder import StackGRUDecoder
 
 
 class ChemVAE(pl.LightningModule):

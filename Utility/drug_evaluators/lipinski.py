@@ -68,19 +68,21 @@ class Lipinski(DrugEvaluator):
 
         return (
             (
-                pass_num_hdonors and pass_num_hacceptors and pass_mol_weight
+                pass_num_hdonors
+                and pass_num_hacceptors
+                and pass_mol_weight
                 and pass_mol_logp
-            ), {
-                'hydrogen_bond_donors': num_hdonors,
-                'hydrogen_bond_acceptors': num_hacceptors,
-                'molecular_weight': mol_weight,
-                'logp': mol_logp,
-                'test_results':
-                    {
-                        'hydrogen_bond_donors': pass_num_hdonors,
-                        'hydrogen_bond_acceptors': pass_num_hacceptors,
-                        'molecular_weight': pass_mol_weight,
-                        'logp': pass_mol_logp
-                    }
-            }
+            ),
+            {
+                "hydrogen_bond_donors": num_hdonors,
+                "hydrogen_bond_acceptors": num_hacceptors,
+                "molecular_weight": mol_weight,
+                "logp": mol_logp,
+                "test_results": {
+                    "hydrogen_bond_donors": pass_num_hdonors,
+                    "hydrogen_bond_acceptors": pass_num_hacceptors,
+                    "molecular_weight": pass_mol_weight,
+                    "logp": pass_mol_logp,
+                },
+            },
         )

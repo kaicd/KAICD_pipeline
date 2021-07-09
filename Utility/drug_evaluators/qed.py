@@ -35,4 +35,4 @@ class QED(DrugEvaluator):
             return qed(mol)
         # Catch atom valence exception raised by CalcCrippenDescriptor
         except Exception:
-            return 0.
+            return 0.0
