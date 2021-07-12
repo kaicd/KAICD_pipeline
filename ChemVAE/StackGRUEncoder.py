@@ -1,19 +1,15 @@
-import torch as th
+"""Model Classes Module."""
+import torch
 import torch.nn as nn
-import pytoda
-from paccmann_chemistry.models.stack_rnn import StackGRU
-from paccmann_chemistry.utils import (
-    perpare_packed_input,
-    manage_step_packed_vars,
-    unpack_sequence,
-    repack_sequence,
-)
+
+from Utility import utils
+from .StackGRU import StackGRU
 
 
 class StackGRUEncoder(StackGRU):
     """Stacked GRU Encoder."""
 
-    def __init__(self, params, **kwargs):
+    def __init__(self, params):
         """
         Constructor.
         Args:
@@ -56,32 +52,6 @@ class StackGRUEncoder(StackGRU):
             out_features=self.latent_dim,
         )
 
-    def encoder_train_step(self, input_seq):
-        """
-        The Encoder Train Step.
-        Args:
-            input_seq (torch.Tensor): the sequence of indices for the input
-            of shape `[max batch sequence length +1, batch_size]`, where +1 is
-            for the added start_index.
-        Note: Input_seq is an output of sequential_data_preparation(batch) with
-            batches returned by a DataLoader object.
-        Returns:
-            (torch.Tensor, torch.Tensor): mu, logvar
-            mu is the latent mean of shape `[1, batch_size, latent_dim]`.
-            logvar is the log of the latent variance of shape
-                `[1, batch_size, latent_dim]`.
-        """
-        # Forward pass
-        hidden = self.init_hidden
-        stack = self.init_stack
-
-        hidden = self._forward_fn(input_seq, hidden, stack)
-
-        mu = self.hidden_to_mu(hidden)
-        logvar = self.hidden_to_logvar(hidden)
-
-        return mu, logvar
-
     def _forward_pass_padded(self, input_seq, hidden, stack):
         """
         The Encoder Train Step.
@@ -98,7 +68,7 @@ class StackGRUEncoder(StackGRU):
                 `[1, batch_size, latent_dim]`.
         """
         if isinstance(input_seq, nn.utils.rnn.PackedSequence) or not isinstance(
-            input_seq, th.Tensor
+            input_seq, torch.Tensor
         ):
             raise TypeError("Input is PackedSequence or is not a Tensor")
         expanded_input_seq = input_seq.unsqueeze(1)
@@ -126,7 +96,7 @@ class StackGRUEncoder(StackGRU):
                 )
             # Concatenate forward and backward
             hidden_backward = self._post_gru_reshape(hidden_backward)
-            hidden = th.cat([hidden, hidden_backward], dim=1)
+            hidden = torch.cat([hidden, hidden_backward], axis=1)
         return hidden
 
     def _forward_pass_packed(self, input_seq, hidden, stack):
@@ -148,15 +118,15 @@ class StackGRUEncoder(StackGRU):
 
         final_hidden = hidden.detach().clone()
         final_stack = stack.detach().clone()
-        input_seq_packed, batch_sizes = perpare_packed_input(input_seq)
+        input_seq_packed, batch_sizes = utils.perpare_packed_input(input_seq)
 
         prev_batch = batch_sizes[0]
 
         for input_entry, batch_size in zip(input_seq_packed, batch_sizes):
-            final_hidden, hidden = manage_step_packed_vars(
+            final_hidden, hidden = utils.manage_step_packed_vars(
                 final_hidden, hidden, batch_size, prev_batch, batch_dim=1
             )
-            final_stack, stack = manage_step_packed_vars(
+            final_stack, stack = utils.manage_step_packed_vars(
                 final_stack, stack, batch_size, prev_batch, batch_dim=0
             )
             prev_batch = batch_size
@@ -167,10 +137,7 @@ class StackGRUEncoder(StackGRU):
         left_dims = hidden.shape[1]
         final_hidden[:, :left_dims, :] = hidden[:, :left_dims, :]
         final_stack[:left_dims, :, :] = stack[:left_dims, :, :]
-
-        hidden = final_hidden
-        stack = final_stack
-        hidden = self._post_gru_reshape(hidden)
+        hidden = self._post_gru_reshape(final_hidden)
 
         # Backward pass:
         if self.bidirectional:
@@ -178,25 +145,25 @@ class StackGRUEncoder(StackGRU):
             hidden_backward = self.backward_stackgru.init_hidden
             stack_backward = self.backward_stackgru.init_stack
 
-            input_seq = unpack_sequence(input_seq)
+            input_seq = utils.unpack_sequence(input_seq)
 
             for i, seq in enumerate(input_seq):
                 idx = [i for i in range(len(seq) - 1, -1, -1)]
-                idx = th.LongTensor(idx)
+                idx = torch.LongTensor(idx)
                 input_seq[i] = seq.index_select(0, idx)
 
-            input_seq = repack_sequence(input_seq)
-            input_seq_packed, batch_sizes = perpare_packed_input(input_seq)
+            input_seq = utils.repack_sequence(input_seq)
+            input_seq_packed, batch_sizes = utils.perpare_packed_input(input_seq)
 
             final_hidden = hidden_backward.detach().clone()
             prev_batch = batch_sizes[0]
 
             for input_entry, batch_size in zip(input_seq_packed, batch_sizes):
                 # for seq in input_seq:
-                final_hidden, hidden_backward = manage_step_packed_vars(
+                final_hidden, hidden_backward = utils.manage_step_packed_vars(
                     final_hidden, hidden_backward, batch_size, prev_batch, batch_dim=1
                 )
-                final_stack, stack_backward = manage_step_packed_vars(
+                final_stack, stack_backward = utils.manage_step_packed_vars(
                     final_stack, stack_backward, batch_size, prev_batch, batch_dim=0
                 )
                 prev_batch = batch_size
@@ -213,12 +180,12 @@ class StackGRUEncoder(StackGRU):
 
             # Concatenate forward and backward
             hidden_backward = self._post_gru_reshape(hidden_backward)
-            hidden = th.cat([hidden, hidden_backward], dim=1)
+            hidden = torch.cat([hidden, hidden_backward], axis=1)
         return hidden
 
-    def _post_gru_reshape(self, hidden: th.Tensor) -> th.Tensor:
+    def _post_gru_reshape(self, hidden: torch.Tensor) -> torch.Tensor:
 
-        if not th.equal(th.tensor(hidden.shape), self.expected_shape):
+        if not torch.equal(torch.tensor(hidden.shape), self.expected_shape):
             raise ValueError(
                 f"GRU hidden layer has incorrect shape: {hidden.shape}. "
                 f"Expected shape: {self.expected_shape}"
@@ -226,5 +193,4 @@ class StackGRUEncoder(StackGRU):
 
         # Layers x Batch x Cell_size ->  B x C
         hidden = hidden[-1, :, :]
-
         return hidden

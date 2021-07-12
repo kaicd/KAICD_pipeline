@@ -1,5 +1,6 @@
 import json
 from argparse import ArgumentParser
+
 import torch as th
 import pytorch_lightning as pl
 from typing import Optional, Union, Dict, List
@@ -9,7 +10,7 @@ from pytoda.smiles.smiles_language import SMILESLanguage
 from torch.utils.data.dataloader import DataLoader
 
 
-class DrugAffinity_lightning(pl.LightningDataModule):
+class Predictor_DataModule(pl.LightningDataModule):
     @classmethod
     def add_argparse_args(
         cls, parent_parser: ArgumentParser, **kwargs
@@ -56,14 +57,14 @@ class DrugAffinity_lightning(pl.LightningDataModule):
         *args,
         **kwargs,
     ):
-        super(DrugAffinity_lightning, self).__init__()
+        super(Predictor_DataModule, self).__init__()
         self.train_affinity_filepath = project_filepath + train_affinity_filepath
         self.test_affinity_filepath = project_filepath + test_affinity_filepath
         self.protein_filepath = project_filepath + protein_filepath
         self.smi_filepath = project_filepath + smi_filepath
         self.smiles_language_filepath = project_filepath + smiles_language_filepath
         self.protein_language_filepath = project_filepath + protein_language_filepath
-        self.params_filepath = project_filepath + params_filepath
+        self.params_filepath = params_filepath
         self.smiles_language = SMILESLanguage.load(self.smiles_language_filepath)
         self.protein_language = ProteinLanguage.load(self.protein_language_filepath)
         self.params = {}

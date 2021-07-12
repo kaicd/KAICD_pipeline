@@ -1,25 +1,18 @@
+"""Model Classes Module."""
+from itertools import takewhile
+
 import torch as th
 import torch.nn as nn
-import pytoda
-from paccmann_chemistry.models.stack_rnn import StackGRU
-from paccmann_chemistry.utils import (
-    perpare_packed_input,
-    manage_step_packed_vars,
-    packed_to_padded,
-)
-from paccmann_chemistry.utils.search import (
-    Search,
-    SamplingSearch,
-    BeamSearch,
-    GreedySearch,
-)
-from paccmann_chemistry.utils.hyperparams import OPTIMIZER_FACTORY
+
+from Utility import utils
+from Utility.search import BeamSearch, SamplingSearch
+from .StackGRU import StackGRU
 
 
 class StackGRUDecoder(StackGRU):
-    """Stacked GRU Decoder."""
+    """Stack GRU Decoder."""
 
-    def __init__(self, params, **kwargs):
+    def __init__(self, params, *args, **kwargs):
         """
         Constructor.
         Args:
@@ -42,44 +35,14 @@ class StackGRUDecoder(StackGRU):
             bidirectional (bool, optional): Whether to train a bidirectional
                 GRU. Defaults to False.
         """
-        super(StackGRUDecoder, self).__init__(params)
-
+        super(StackGRUDecoder, self).__init__(params, *args, **kwargs)
+        self.params = params
         self.latent_dim = params["latent_dim"]
         self.latent_to_hidden = nn.Linear(
             in_features=self.latent_dim, out_features=self.rnn_cell_size
         )
         self.output_layer = nn.Linear(self.rnn_cell_size, self.vocab_size)
-
         self.criterion = nn.CrossEntropyLoss()
-
-        self.optimizer = OPTIMIZER_FACTORY[params.get("optimizer", "adadelta")](
-            self.parameters(), lr=params.get("lr", 0.01)
-        )  # yapf: disable
-
-    def decoder_train_step(self, latent_z, input_seq, target_seq):
-        """
-        The Decoder Train Step.
-        Args:
-            latent_z (torch.Tensor): The sampled latent representation
-                of the SMILES to be used for generation of shape
-                `[1, batch_size, latent_dim]`.
-            input_seq (torch.Tensor): The sequence of indices for the
-                input of size `[max batch sequence length +1, batch_size]`,
-                where +1 is for the added start_index.
-            target_seq (torch.Tensor): The sequence of indices for the
-                target of shape `[max batch sequence length +1, batch_size]`,
-                where +1 is for the added end_index.
-        Note: Input and target sequences are outputs of
-            sequential_data_preparation(batch) with batches returned by a
-            DataLoader object.
-        Returns:
-            The cross-entropy training loss for the decoder.
-        """
-        hidden = self.latent_to_hidden(latent_z)
-        stack = self.init_stack
-
-        loss = self._forward_fn(input_seq, target_seq, hidden, stack)
-        return loss
 
     def _forward_pass_padded(self, input_seq, target_seq, hidden, stack):
         """The Decoder Train Step.
@@ -120,18 +83,18 @@ class StackGRUDecoder(StackGRU):
             raise TypeError("Input is not PackedSequence")
 
         loss = 0
-        input_seq_packed, batch_sizes = perpare_packed_input(input_seq)
+        input_seq_packed, batch_sizes = utils.perpare_packed_input(input_seq)
         # Target sequence should have same batch_sizes as input_seq
-        target_seq_packed, _ = perpare_packed_input(target_seq)
+        target_seq_packed, _ = utils.perpare_packed_input(target_seq)
         prev_batch = batch_sizes[0]
         outputs = []
         for idx, (input_entry, target_entry, batch_size) in enumerate(
             zip(input_seq_packed, target_seq_packed, batch_sizes)
         ):
-            _, hidden = manage_step_packed_vars(
+            _, hidden = utils.manage_step_packed_vars(
                 None, hidden, batch_size, prev_batch, batch_dim=1
             )
-            _, stack = manage_step_packed_vars(
+            _, stack = utils.manage_step_packed_vars(
                 None, stack, batch_size, prev_batch, batch_dim=0
             )
 
@@ -143,11 +106,11 @@ class StackGRUDecoder(StackGRU):
 
             loss += self.criterion(output, target_entry)
             outputs.append(th.argmax(output, -1))
-        self.outputs = packed_to_padded(outputs, target_seq_packed)
+        self.outputs = utils.packed_to_padded(outputs, target_seq_packed)
         return loss
 
-    def generate_from_latent(
-        self, latent_z, prime_input, end_token, search=SamplingSearch, generate_len=100
+    def generate(
+        self, latent_z, prime_input, end_token, generate_len=100, search=SamplingSearch
     ):
         """
         Generate SMILES From Latent Z.
@@ -169,15 +132,12 @@ class StackGRUDecoder(StackGRU):
         Note: For each generated sequence all indices after the first
             end_token must be discarded.
         """
-        batch_size = latent_z.shape[1]
-        self._update_batch_size(batch_size)
-
+        self._update_batch_size(latent_z.shape[1], device=latent_z.device)
         latent_z = latent_z.repeat(self.n_layers, 1, 1)
-
         hidden = self.latent_to_hidden(latent_z)
         stack = self.init_stack
 
-        generated_seq = prime_input.repeat(batch_size, 1)
+        generated_seq = prime_input.repeat(self.batch_size, 1)
         prime_input = generated_seq.transpose(1, 0).unsqueeze(1)
 
         # use priming string to "build up" hidden state
@@ -188,7 +148,7 @@ class StackGRUDecoder(StackGRU):
         # initialize beam search
         is_beam = isinstance(search, BeamSearch)
         if is_beam:
-            beams = [[[list(), 0.0]]] * batch_size
+            beams = [[[list(), 0.0]]] * self.batch_size
             input_token = th.stack(
                 [input_token]
                 + [input_token.clone() for _ in range(search.beam_width - 1)]
@@ -203,19 +163,15 @@ class StackGRUDecoder(StackGRU):
         for idx in range(generate_len):
             if not is_beam:
                 output, hidden, stack = self(input_token, hidden, stack)
-
                 logits = self.output_layer(output).squeeze(dim=0)
                 top_idx = search.step(logits)
-
-                input_token = top_idx.view(1, -1).to(self.device)
-
+                input_token = top_idx.view(1, -1).to(latent_z.device)
                 generated_seq = th.cat((generated_seq, top_idx), dim=1)
 
                 # if we don't generate in batches, we can do early stopping.
-                if batch_size == 1 and top_idx == end_token:
+                if self.batch_size == 1 and top_idx == end_token:
                     break
             else:
-
                 output, hidden, stack = zip(
                     *[
                         self(an_input_token, a_hidden, a_stack)
@@ -223,12 +179,13 @@ class StackGRUDecoder(StackGRU):
                             input_token, hidden, stack
                         )
                     ]
-                )  # yapf: disable
+                )
                 logits = th.stack([self.output_layer(o).squeeze() for o in output])
                 hidden = th.stack(hidden)
                 stack = th.stack(stack)
-                input_token, beams = search.step(logits.detach().cpu(), beams)
+                input_token, beams = search.step(logits, beams)
                 input_token = input_token.unsqueeze(1)
+
         if is_beam:
             generated_seq = th.stack(
                 [
@@ -236,5 +193,13 @@ class StackGRUDecoder(StackGRU):
                     th.tensor(beam[0][0])
                     for beam in beams
                 ]
-            )  # yapf: disable
-        return generated_seq
+            )
+
+        molecule_gen = (
+            takewhile(lambda x: x != end_token, molecule[1:])
+            for molecule in generated_seq
+        )
+        molecule_map = map(list, molecule_gen)
+        molecule_iter = iter(map(th.tensor, molecule_map))
+
+        return molecule_iter

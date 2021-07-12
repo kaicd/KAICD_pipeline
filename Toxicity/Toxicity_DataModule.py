@@ -1,6 +1,6 @@
 import json
 from argparse import ArgumentParser
-import torch as th
+
 import pytorch_lightning as pl
 from typing import Optional, Union, Dict, List
 from pytoda.datasets import AnnotatedDataset, SMILESDataset
@@ -59,7 +59,7 @@ class Toxicity_lightning(pl.LightningDataModule):
         self.smi_filepath = project_filepath + smi_filepath
         self.smiles_language_filepath = project_filepath + smiles_language_filepath
         self.smiles_language = SMILESLanguage.load(self.smiles_language_filepath)
-        self.params_filepath = project_filepath + params_filepath
+        self.params_filepath = params_filepath
         self.params = {}
         self.device = device
 

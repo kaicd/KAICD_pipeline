@@ -2,7 +2,7 @@ import json
 import dill
 import os.path as osp
 from argparse import ArgumentParser
-import torch as th
+
 import pytorch_lightning as pl
 from typing import Optional, Union, Dict, List
 from pytoda.datasets import SMILESDataset
@@ -10,10 +10,10 @@ from pytoda.smiles.smiles_language import SMILESLanguage
 from torch.utils.data.dataloader import DataLoader
 
 
-class SELFIES_VAE_lightning(pl.LightningDataModule):
+class ChemVAE_DataModule(pl.LightningDataModule):
     @classmethod
     def add_argparse_args(
-        cls, parent_parser: ArgumentParser, **kwargs
+            cls, parent_parser: ArgumentParser, **kwargs
     ) -> ArgumentParser:
         parser = parent_parser.add_argument_group(cls.__name__)
         parser.add_argument(
@@ -38,33 +38,33 @@ class SELFIES_VAE_lightning(pl.LightningDataModule):
         test_smiles_filepath,
         smiles_language_filepath,
         params_filepath,
-        device,
         *args,
         **kwargs,
     ):
-        super(SELFIES_VAE_lightning, self).__init__()
+        super(ChemVAE_DataModule, self).__init__()
         self.dataset_filepath = project_filepath + "preprocessing/"
         self.train_smiles_filepath = project_filepath + train_smiles_filepath
         self.test_smiles_filepath = project_filepath + test_smiles_filepath
-        self.smiles_language_filepath = project_filepath + smiles_language_filepath
-        self.params_filepath = project_filepath + params_filepath
+        self.smiles_language_filepath = smiles_language_filepath
+        self.params_filepath = params_filepath
         self.smiles_language = SMILESLanguage.load(self.smiles_language_filepath)
         self.params = {}
-        self.device = device
 
         # Process parameter file
         with open(self.params_filepath) as f:
             self.params.update(json.load(f))
 
     def setup(self, stage: Optional[str] = None) -> None:
-        smiles_filepath = [self.test_smiles_filepath, self.test_smiles_filepath]
+        smiles_filepath = [self.train_smiles_filepath, self.test_smiles_filepath]
 
-        if osp.exists(self.dataset_filepath + "train_dataset.pkl") and osp.exists(self.dataset_filepath + "test_dataset.pkl"):
+        if osp.exists(
+            self.dataset_filepath + "ChemVAE_train_dataset.pkl"
+        ) and osp.exists(self.dataset_filepath + "ChemVAE_test_dataset.pkl"):
             print("Preprocessing file already exists!\nLoading...")
 
-            with open(self.dataset_filepath + "train_dataset.pkl", "rb") as f:
+            with open(self.dataset_filepath + "ChemVAE_train_dataset.pkl", "rb") as f:
                 self.train_dataset = dill.load(f)
-            with open(self.dataset_filepath + "test_dataset.pkl", "rb") as f:
+            with open(self.dataset_filepath + "ChemVAE_test_dataset.pkl", "rb") as f:
                 self.test_dataset = dill.load(f)
             print("Done...!")
         else:
@@ -84,18 +84,16 @@ class SELFIES_VAE_lightning(pl.LightningDataModule):
                     remove_bonddir=self.params.get("remove_bonddir", False),
                     remove_chirality=self.params.get("remove_chirality", False),
                     backend="lazy",
-                    device=self.device,
                 )
-
                 if i == 0:
                     self.train_dataset = dataset
                 else:
                     self.test_dataset = dataset
 
             print("Saving...")
-            with open(self.dataset_filepath + "train_dataset.pkl", "wb") as f:
+            with open(self.dataset_filepath + "ChemVAE_train_dataset.pkl", "wb") as f:
                 dill.dump(self.train_dataset, f)
-            with open(self.dataset_filepath + "test_dataset.pkl", "wb") as f:
+            with open(self.dataset_filepath + "ChemVAE_test_dataset.pkl", "wb") as f:
                 dill.dump(self.test_dataset, f)
             print("Done...!")
 
@@ -120,11 +118,10 @@ class SELFIES_VAE_lightning(pl.LightningDataModule):
             Sorted batch from longest to shortest.
         """
         return [
-            batch[index] for index in map(
+            batch[index]
+            for index in map(
                 lambda t: t[0],
-                sorted(
-                    enumerate(batch), key=lambda t: t[1].shape[0], reverse=True
-                )
+                sorted(enumerate(batch), key=lambda t: t[1].shape[0], reverse=True),
             )
         ]
 
@@ -134,4 +131,4 @@ class SELFIES_VAE_lightning(pl.LightningDataModule):
         return self.dataloader(self.train_dataset, shuffle=True)
 
     def val_dataloader(self) -> Union[DataLoader, List[DataLoader]]:
-        return self.dataloader(self.test_dataset, shuffle=False)
+        return self.dataloader(self.test_dataset, shuffle=True)

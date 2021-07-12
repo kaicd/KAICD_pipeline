@@ -5,6 +5,7 @@ from typing import Tuple
 
 import torch as th
 import torch.nn as nn
+import torch.nn.functional as F
 import pytorch_lightning as pl
 from sklearn.metrics import (
     auc,
@@ -12,18 +13,19 @@ from sklearn.metrics import (
     precision_recall_curve,
     roc_curve,
 )
-from paccmann_predictor.utils.hyperparams import (
+
+from Utility.hyperparams import (
     ACTIVATION_FN_FACTORY,
     OPTIMIZER_FACTORY,
+    LOSS_FN_FACTORY,
 )
-from paccmann_predictor.utils.layers import (
+from Utility.layers import (
     alpha_projection,
     convolutional_layer,
     dense_layer,
     smiles_projection,
+    EnsembleLayer,
 )
-from toxsmi.utils.hyperparams import LOSS_FN_FACTORY
-from toxsmi.utils.layers import EnsembleLayer
 
 
 class MCA_lightning(pl.LightningModule):
@@ -38,7 +40,6 @@ class MCA_lightning(pl.LightningModule):
 
     def __init__(
         self,
-        project_filepath,
         params_filepath,
         **kwargs,
     ):
@@ -89,7 +90,7 @@ class MCA_lightning(pl.LightningModule):
         ```
         """
         super(MCA_lightning, self).__init__()
-        self.params_filepath = project_filepath + params_filepath
+        self.params_filepath = params_filepath
 
         # Model Parameter
         params = {}
@@ -101,7 +102,7 @@ class MCA_lightning(pl.LightningModule):
         self.loss_fn = LOSS_FN_FACTORY[
             params.get("loss_fn", "binary_cross_entropy_ignore_nan_and_sum")
         ]  # yapf: disable
-        self.opt_fn = OPTIMIZER_FACTORY[params.get("optimizer", "adam")]
+        self.opt_fn = OPTIMIZER_FACTORY[params.get("optimizer", "Adam")]
 
         self.num_tasks = params.get("num_tasks", 12)
         self.smiles_attention_size = params.get("smiles_attention_size", 64)
@@ -112,7 +113,7 @@ class MCA_lightning(pl.LightningModule):
         self.hidden_sizes = [
             self.multiheads[0] * params["smiles_embedding_size"]
             + sum([h * f for h, f in zip(self.multiheads[1:], self.filters)])
-        ] + params.get("stacked_hidden_sizes", [1024, 512])
+        ] + params.get("stacked_dense_hidden_sizes", [1024, 512])
 
         self.dropout = params.get("dropout", 0.5)
         self.use_batch_norm = params.get("batch_norm", True)
@@ -144,11 +145,7 @@ class MCA_lightning(pl.LightningModule):
             )
             # Plug in one hot-vectors and freeze weights
             self.smiles_embedding.load_state_dict(
-                {
-                    "weight": th.nn.functional.one_hot(
-                        th.arange(params["smiles_vocabulary_size"])
-                    )
-                }
+                {"weight": F.one_hot(th.arange(params["smiles_vocabulary_size"]))}
             )
             self.smiles_embedding.weight.requires_grad = False
 
@@ -182,7 +179,7 @@ class MCA_lightning(pl.LightningModule):
                             act_fn=self.act_fn,
                             dropout=self.dropout,
                             batch_norm=self.use_batch_norm,
-                        ).to(self.device),
+                        ),
                     )
                     for index, (num_kernel, kernel_size) in enumerate(
                         zip(self.filters, self.kernel_sizes)
@@ -233,7 +230,7 @@ class MCA_lightning(pl.LightningModule):
                             act_fn=self.act_fn,
                             dropout=self.dropout,
                             batch_norm=self.use_batch_norm,
-                        ).to(self.device),
+                        ),
                     )
                     for ind in range(len(self.hidden_sizes) - 1)
                 ]
@@ -270,9 +267,7 @@ class MCA_lightning(pl.LightningModule):
             predictions are toxicity predictions of shape `[bs, num_tasks]`.
             prediction_dict includes the prediction and attention weights.
         """
-
         embedded_smiles = self.smiles_embedding(smiles.to(dtype=th.int64))
-
         # SMILES Convolutions. Unsqueeze has shape batch_size x 1 x T x H.
         encoded_smiles = [embedded_smiles] + [
             self.convolutional_layers[ind](th.unsqueeze(embedded_smiles, 1)).permute(
@@ -294,9 +289,7 @@ class MCA_lightning(pl.LightningModule):
                 )
                 # Sequence is always reduced.
                 encodings.append(
-                    th.sum(
-                        encoded_smiles[layer] * th.unsqueeze(smiles_alphas[-1], -1), 1
-                    )
+                    th.sum(encoded_smiles[layer] * th.unsqueeze(smiles_alphas[-1], -1), 1)
                 )
         encodings = th.cat(encodings, dim=1)
 
