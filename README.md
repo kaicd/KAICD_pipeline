@@ -16,28 +16,29 @@ data
 This is around **6GB** of data, required for pretaining multiple models.
 Also, the workload required to run the full pipeline is intensive and might not be straightforward to run all the steps on a desktop laptop.
 
-
-# PaccMann_rl generator(Pytorch-Lightning)
+### SELFIES VAE(Pytorch-Lightning)
 ```console
-(paccmann_sarscov2) $ PYTHONPATH='./' python ./main/pl_train_generator.py
+(paccmann_sarscov2) $ PYTHONPATH='./' python ./ChemVAE/ChemVAE_Main.py
+```
+
+### protein VAE
+```console
+(paccmann_sarscov2) $ PYTHONPATH='./' python ./ProtVAE/ProtVAE_Main.py
 ```
 
 ### affinity predictor(Pytorch-Lightning)
 ```console
-(paccmann_sarscov2) $ PYTHONPATH='./' python ./main/pl_train_affinity.py
+(paccmann_sarscov2) $ PYTHONPATH='./' python ./Predictor/Predictor_Main.py
 ```
 
 ### toxicity predictor(Pytorch-Lightning)
 ```console
-(paccmann_sarscov2) $ PYTHONPATH='./' python ./main/pl_train_toxicity.py
+(paccmann_sarscov2) $ PYTHONPATH='./' python ./Toxicity/Toxicity_Main.py
 ```
 
-### protein VAE
-It will be implemented soon...
-
-### SELFIES VAE(Pytorch-Lightning)
+# PaccMann_rl generator(Pytorch-Lightning)
 ```console
-(paccmann_sarscov2) $ PYTHONPATH='./' python ./main/pl_train_selfies.py
+(paccmann_sarscov2) $ PYTHONPATH='./' python ./Reinforce/Reinforce_Main.py
 ```
 
 ### SMILESDataset data to SMILES
@@ -49,18 +50,4 @@ for data in batch:
   mol = self.smiles_language.token_indexes_to_smiles(mol)
   mol = self.smiles_language.selfies_to_smiles(mol) if self.selfies else mol
   smiles_batch.append(mol)
-```
-
-# PaccMann_rl generator(train_conditional_generator.py : Not implemented by Pytorch-Lightning)
-```console
-(paccmann_sarscov2) $ for protein_id in (seq 40)
-  python ./main/train_conditional_generator.py \
-  /raid/paccmann-covid/models/SELFIESVAE \
-  /raid/paccmann-covid/models/ProteinVAE \
-  /raid/paccmann-covid/models/affinity \
-  /raid/paccmann-covid/data/training/merged_sequence_encoding/uniprot_covid-19.csv \
-  /raid/paccmann-covid/params/conditional_generator.json paccmann_sarscov2 $protein_id \
-  /raid/paccmann-covid/data/training/unbiased_predictions --tox21_path \
-  /raid/paccmann-covid/models/Tox21
-  end
 ```
