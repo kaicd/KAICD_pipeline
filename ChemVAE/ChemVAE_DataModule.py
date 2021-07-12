@@ -10,10 +10,10 @@ from pytoda.smiles.smiles_language import SMILESLanguage
 from torch.utils.data.dataloader import DataLoader
 
 
-class SELFIES_VAE_lightning(pl.LightningDataModule):
+class ChemVAE_DataModule(pl.LightningDataModule):
     @classmethod
     def add_argparse_args(
-        cls, parent_parser: ArgumentParser, **kwargs
+            cls, parent_parser: ArgumentParser, **kwargs
     ) -> ArgumentParser:
         parser = parent_parser.add_argument_group(cls.__name__)
         parser.add_argument(
@@ -41,11 +41,11 @@ class SELFIES_VAE_lightning(pl.LightningDataModule):
         *args,
         **kwargs,
     ):
-        super(SELFIES_VAE_lightning, self).__init__()
+        super(ChemVAE_DataModule, self).__init__()
         self.dataset_filepath = project_filepath + "preprocessing/"
         self.train_smiles_filepath = project_filepath + train_smiles_filepath
         self.test_smiles_filepath = project_filepath + test_smiles_filepath
-        self.smiles_language_filepath = project_filepath + smiles_language_filepath
+        self.smiles_language_filepath = smiles_language_filepath
         self.params_filepath = params_filepath
         self.smiles_language = SMILESLanguage.load(self.smiles_language_filepath)
         self.params = {}
@@ -55,7 +55,7 @@ class SELFIES_VAE_lightning(pl.LightningDataModule):
             self.params.update(json.load(f))
 
     def setup(self, stage: Optional[str] = None) -> None:
-        smiles_filepath = [self.test_smiles_filepath, self.test_smiles_filepath]
+        smiles_filepath = [self.train_smiles_filepath, self.test_smiles_filepath]
 
         if osp.exists(
             self.dataset_filepath + "ChemVAE_train_dataset.pkl"

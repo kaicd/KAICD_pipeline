@@ -30,7 +30,7 @@ parser.add_argument("--seed", type=int, default=42)
 parser.add_argument(
     "--params_filepath",
     type=str,
-    default="Config/toxsmi.json",
+    default="Config/Toxicity.json",
     help="Path to the parameter file.",
 )
 parser.add_argument(

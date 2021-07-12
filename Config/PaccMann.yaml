@@ -9,7 +9,7 @@ DTI_filepath:
   save_filepath: "/raid/PaccMann_sarscov2/paccmann_predictor/checkpoint/"
   smiles_language_filepath: "data/pretraining/language_models/smiles_language_chembl_gdsc_ccle_tox21_zinc_organdb_bindingdb.pkl"
   protein_language_filepath: "data/pretraining/language_models/protein_language_bindingdb.pkl"
-  params_filepath: "Config/affinity.json"
+  params_filepath: "Config/Predictor.json"
   train_affinity_filepath: "data/pretraining/affinity_predictor/filtered_train_binding_data.csv"
   test_affinity_filepath: "data/pretraining/affinity_predictor/filtered_val_binding_data.csv"
   protein_filepath: "data/pretraining/affinity_predictor/sequences.smi"
@@ -18,7 +18,7 @@ DTI_filepath:
 Toxicity_filepath:
   project_filepath: "/raid/PaccMann_sarscov2/"
   save_filepath: "/raid/PaccMann_sarscov2/paccmann_toxsmi/checkpoint/"
-  params_filepath: "Config/toxsmi.json"
+  params_filepath: "Config/Toxicity.json"
   embedding_path: "data/pretraining/toxicity_predictor/smiles_vae_embeddings.pkl"
   train_score_filepath: "data/pretraining/toxicity_predictor/tox21_train.csv"
   test_score_filepath: "data/pretraining/toxicity_predictor/tox21_test.csv"
@@ -29,14 +29,14 @@ ChemVAE_filepath:
   project_filepath: "/raid/PaccMann_sarscov2/"
   save_filepath: "/raid/PaccMann_sarscov2/paccmann_chemistry/checkpoint/"
   smiles_language_filepath: "data/pretraining/language_models/selfies_language.pkl"
-  params_filepath: "Config/selfies.json"
+  params_filepath: "Config/ChemVAE.json"
   train_smiles_filepath: "data/pretraining/SELFIESVAE/train_chembl_22_clean_1576904_sorted_std_final.smi"
   test_smiles_filepath: "data/pretraining/SELFIESVAE/test_chembl_22_clean_1576904_sorted_std_final.smi"
 
 ProtVAE_filepath:
   project_filepath: "/raid/PaccMann_sarscov2/"
   save_filepath: "/raid/PaccMann_sarscov2/paccmann_omics/checkpoint/"
-  params_filepath: "Config/omics.json"
+  params_filepath: "Config/ProtVAE.json"
   train_filepath: "data/pretraining/ProteinVAE/tape_encoded/train_representation.csv"
   test_filepath: "data/pretraining/ProteinVAE/tape_encoded/val_representation.csv"
 
@@ -45,7 +45,7 @@ Reinforce_filepath:
   protein_model_path: "/raid/paccmann-covid/models/ProteinVAE"
   affinity_model_path: "/raid/paccmann-covid/models/affinity"
   protein_data_path: "/raid/paccmann-covid/data/training/merged_sequence_encoding/uniprot_covid-19.csv"
-  params_path: "Config/conditional_generator.json"
+  params_path: "Config/Reinforce.json"
   model_name: "paccmann_sarscov2"
   test_protein_id: 35
   unbiased_predictions_path: "/raid/paccmann-covid/data/training/unbiased_predictions"

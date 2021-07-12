@@ -289,9 +289,7 @@ class MCA_lightning(pl.LightningModule):
                 )
                 # Sequence is always reduced.
                 encodings.append(
-                    th.sum(
-                        encoded_smiles[layer] * th.unsqueeze(smiles_alphas[-1], -1), 1
-                    )
+                    th.sum(encoded_smiles[layer] * th.unsqueeze(smiles_alphas[-1], -1), 1)
                 )
         encodings = th.cat(encodings, dim=1)
 

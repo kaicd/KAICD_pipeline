@@ -1,5 +1,7 @@
 """PaccMann^RL: Policy gradient class"""
 import os
+import argparse
+from argparse import ArgumentParser
 
 import numpy as np
 import pandas as pd
@@ -9,11 +11,11 @@ from rdkit import Chem
 from wandb import Image, Table
 from PIL import Image as pilimg
 
-from .Reinforce_Base import Reinforce_base
+from .Reinforce_Base import Reinforce_Base
 from Utility.utils import generate_mols_img, plot_and_compare_proteins
 
 
-class Reinforce(Reinforce_base):
+class Reinforce_Module(Reinforce_Base):
     """
     Pipeline to reproduce the results using pytorch_lightning of the paper
     Data-driven molecular design for discovery and synthesis of novel ligands:
@@ -21,12 +23,18 @@ class Reinforce(Reinforce_base):
     """
 
     def __init__(self, **kwargs):
-        super(Reinforce, self).__init__(**kwargs)
+        super(Reinforce_Module, self).__init__(**kwargs)
         # Define for save result(good molecules!) in dataframe
-        self.biased_ratios, self.tox_ratios = [], []
-        self.rewards, self.rl_losses = [], []
+        self.best_biased_ratio = 0
         self.gen_mols, self.gen_prot, self.gen_affinity, self.toxes = [], [], [], []
         self.non_toxic_useful_smiles, self.non_toxic_useful_preds = [], []
+        (
+            self.gen_mols_qed,
+            self.gen_mols_scscore,
+            self.gen_mols_esol,
+            self.gen_mols_sas,
+            self.gen_mols_lipinski,
+        ) = ([], [], [], [], [])
 
     """
     Implementation of the policy gradient algorithm.
@@ -81,8 +89,6 @@ class Reinforce(Reinforce_base):
                 self.grad_clipping,
             )
         # Save and log results
-        self.rewards.append(summed_reward)
-        self.rl_losses.append(rl_loss)
         self.log("mean_rewards", summed_reward)
         self.log("rl_loss", rl_loss)
 
@@ -97,49 +103,59 @@ class Reinforce(Reinforce_base):
         useful_smiles = [s for i, s in enumerate(smiles) if preds[i] > 0.5]
         useful_preds = preds[preds > 0.5]
         for p, s in zip(useful_preds, useful_smiles):
+            # Save effective molecules
             self.gen_mols.append(s)
             self.gen_prot.append(self.protein_test_name)
             self.gen_affinity.append(p)
-
+            # Save toxicity of effective molecules
             tox = self.tox21(s)
             self.toxes.append(tox)
             if tox == 1.0:
                 self.non_toxic_useful_smiles.append(s)
                 self.non_toxic_useful_preds.append(p)
+            # Save property of effective molecules
+            self.gen_mols_qed.append(self.qed(s))
+            self.gen_mols_scscore.append(self.scscore(s))
+            self.gen_mols_esol.append(self.esol(s))
+            self.gen_mols_sas.append(self.sas(s))
         # Log efficacy and non toxicity ratio
+        save_path = "/raid/PaccMann_sarscov2/binding_images/" + self.protein_test_name
+        if not os.path.isdir(save_path):
+            os.mkdir(save_path)
         plot_and_compare_proteins(
             self.unbiased_preds,
             preds,
             self.protein_test_name,
             self.current_epoch,
-            self.project_path,
+            "/raid/PaccMann_sarscov2",
             "train",
             self.batch_size,
         )
         biased_ratio = np.round((np.sum(preds > 0.5) / len(preds)) * 100, 1)
-        self.biased_ratios.append(biased_ratio)
         all_toxes = np.array([self.tox21(s) for s in smiles])
         tox_ratio = np.round((np.sum(all_toxes == 1.0) / len(all_toxes)) * 100, 1)
-        self.tox_ratios.append(tox_ratio)
         self.log("efficacy_ratio", biased_ratio)
         self.log("non_tox_ratio", tox_ratio)
         # Log distribution plot
-
-        self.logger.experiment.log(
-            {
-                "NAIVE and BIASED binding compounds distribution": [
-                    Image(
-                        pilimg.open(
-                            os.path.join(
-                                self.project_path,
-                                "binding_images",
-                                f"train_{self.protein_test_name}_epoch_{self.current_epoch}_eff_{biased_ratio}.png",
+        if self.best_biased_ratio <= biased_ratio:
+            self.logger.experiment.log(
+                {
+                    "NAIVE and BIASED binding compounds distribution": [
+                        Image(
+                            pilimg.open(
+                                os.path.join(
+                                    "/raid",
+                                    "PaccMann_sarscov2",
+                                    "binding_images",
+                                    self.protein_test_name,
+                                    f"train_{self.protein_test_name}_epoch_{self.current_epoch}_eff_{biased_ratio}.png",
+                                )
                             )
                         )
-                    )
-                ]
-            }
-        )
+                    ]
+                }
+            )
+            self.best_biased_ratio = biased_ratio
         # Log top 4 generate molecule
         idx = np.argsort(self.non_toxic_useful_preds)[::-1]
         lead = []
@@ -168,11 +184,16 @@ class Reinforce(Reinforce_base):
                 "SMILES": self.gen_mols,
                 "Binding probability": self.gen_affinity,
                 "Tox21": self.toxes,
+                "QED": self.gen_mols_qed,
+                "SCScore": self.gen_mols_scscore,
+                "ESOL": self.gen_mols_esol,
+                "SAS": self.gen_mols_sas,
+                "Lipinski": self.gen_mols_lipinski
             }
         )
         df.to_csv(
             os.path.join(
-                self.project_path, "results", self.protein_test_name + "_generated.csv"
+                "/raid", "PaccMann_sarscov2", "results", self.protein_test_name + "_generated.csv"
             )
         )
-        self.logger.experiment.log(Table(dataframe=df))
+        self.logger.experiment.log({"Generate Molecules": [Table(dataframe=df)]})

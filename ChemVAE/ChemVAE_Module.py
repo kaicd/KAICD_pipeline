@@ -10,18 +10,18 @@ from Utility.utils import (
     packed_sequential_data_preparation,
     sequential_data_preparation,
 )
-from .StackGRUEncoder import StackGRUEncoder
-from .StackGRUDecoder import StackGRUDecoder
+from ChemVAE.StackGRUEncoder import StackGRUEncoder
+from ChemVAE.StackGRUDecoder import StackGRUDecoder
 
 
-class ChemVAE(pl.LightningModule):
+class ChemVAE_Module(pl.LightningModule):
     def __init__(
         self, project_filepath, params_filepath, smiles_language_filepath, **kwargs
     ):
-        super(ChemVAE, self).__init__()
+        super(ChemVAE_Module, self).__init__()
         # Set configuration file path
         self.params_filepath = params_filepath
-        self.smiles_language_filepath = project_filepath + smiles_language_filepath
+        self.smiles_language_filepath = smiles_language_filepath
         # Load parameters
         params = {}
         with open(self.params_filepath) as f:

@@ -9,7 +9,7 @@ from torch.utils.data.dataloader import DataLoader
 from pytoda.datasets._csv_eager_dataset import _CsvEagerDataset
 
 
-class Protein_VAE_lightning(pl.LightningDataModule):
+class ProtVAE_DataModule(pl.LightningDataModule):
     @classmethod
     def add_argparse_args(
         cls, parent_parser: ArgumentParser, **kwargsdouble
@@ -39,7 +39,7 @@ class Protein_VAE_lightning(pl.LightningDataModule):
         *args,
         **kwargs,
     ):
-        super(Protein_VAE_lightning, self).__init__()
+        super(ProtVAE_DataModule, self).__init__()
         self.dataset_filepath = project_filepath + "preprocessing/"
         self.train_filepath = project_filepath + train_filepath
         self.test_filepath = project_filepath + test_filepath

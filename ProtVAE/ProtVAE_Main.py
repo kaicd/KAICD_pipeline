@@ -4,8 +4,8 @@ import pytorch_lightning as pl
 from pytorch_lightning import loggers
 from pytorch_lightning.callbacks import ModelCheckpoint
 
-from ProtVAE_Module import ProtVAE
-from ProtVAE_DataModule import Protein_VAE_lightning
+from ProtVAE_Module import ProtVAE_Module
+from ProtVAE_DataModule import ProtVAE_DataModule
 
 parser = argparse.ArgumentParser()
 
@@ -27,7 +27,7 @@ parser.add_argument("--seed", type=int, default=42)
 parser.add_argument(
     "--params_filepath",
     type=str,
-    default="Config/omics.json",
+    default="Config/ProtVAE.json",
     help="Path to the parameter file.",
 )
 
@@ -36,13 +36,13 @@ parser = pl.Trainer.add_argparse_args(parser)
 parser.set_defaults(gpus=1, accelerator="ddp", max_epochs=100)
 
 # Dataset args
-parser = Protein_VAE_lightning.add_argparse_args(parser)
+parser = ProtVAE_DataModule.add_argparse_args(parser)
 args, _ = parser.parse_known_args()
 pl.seed_everything(args.seed)
 
 # Define dataset and model
-net = ProtVAE(**vars(args))
-data = Protein_VAE_lightning(**vars(args))
+net = ProtVAE_Module(**vars(args))
+data = ProtVAE_DataModule(**vars(args))
 
 # Define pytorch-lightning Trainer multiple callbacks
 on_best_loss = ModelCheckpoint(

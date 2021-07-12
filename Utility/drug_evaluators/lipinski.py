@@ -41,7 +41,10 @@ class Lipinski(DrugEvaluator):
         else:
             raise TypeError("Input must be from {str, rdkit.Chem.rdchem.Mol}")
 
-        return self.calc_lipinski(mol)
+        try:
+            return self.calc_lipinski(mol)
+        except:
+            return None
 
     def calc_lipinski(self, mol):
         """

@@ -539,6 +539,7 @@ def plot_and_compare_proteins(
         os.path.join(
             save_path,
             "binding_images",
+            protein_name,
             f"{mode}_{protein}_epoch_{epoch}_eff_{biased_ratio}.png",
         )
     )

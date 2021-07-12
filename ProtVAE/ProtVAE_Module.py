@@ -11,7 +11,7 @@ from Utility.loss_functions import joint_loss
 from Utility.utils import augment
 
 
-class ProtVAE(pl.LightningModule):
+class ProtVAE_Module(pl.LightningModule):
     """Variational Auto-Encoder (VAE)"""
 
     def __init__(self, params_filepath, *args, **kwargs):
@@ -28,7 +28,7 @@ class ProtVAE(pl.LightningModule):
             2) The encoder strives to learn mean and log-variance of the
                 latent space.
         """
-        super(ProtVAE, self).__init__()
+        super(ProtVAE_Module, self).__init__()
         # Set configuration file path
         self.params_filepath = params_filepath
         # Load parameters
@@ -80,11 +80,7 @@ class ProtVAE(pl.LightningModule):
         return sample
 
     def shared_step(self, batch, mode, *args, **kwargs):
-        _batch = (
-            augment(batch, dropout=self.DAE_mask, sigma=self.DAE_noise).to(self.device)
-            if mode == "train"
-            else batch
-        )
+        _batch = augment(batch, dropout=self.DAE_mask, sigma=self.DAE_noise).to(self.device) if mode == "train" else batch
         _batch_fake = self(_batch).to(th.float32)
         loss, rec, kld = joint_loss(
             _batch_fake,

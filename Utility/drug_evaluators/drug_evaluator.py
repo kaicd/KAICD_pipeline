@@ -42,7 +42,7 @@ class DrugEvaluator:
             params = json.load(f)
         # Set up language and transforms
         self.smiles_language = SMILESLanguage.load(
-            os.path.join(project_path, "language", "smiles_language.pkl")
+            os.path.join(project_path, "Config", "smiles_language.pkl")
         )
         self.transforms = self.compose_smiles_transforms(params)
         # Initialize and restore model weights

@@ -13,9 +13,9 @@ from pytoda.proteins.protein_language import ProteinLanguage
 from pytoda.smiles.smiles_language import SMILESLanguage
 
 from Utility.utils import ProteinDataset
-from ChemVAE.ChemVAE_Module import ChemVAE
-from ProtVAE.ProtVAE_Module import ProtVAE
-from DTI.DTI_Module import BimodalMCA_lightning
+from ChemVAE.ChemVAE_Module import ChemVAE_Module
+from ProtVAE.ProtVAE_Module import ProtVAE_Module
+from Predictor.Predictor_Module import Predictor_Module
 from Utility.drug_evaluators import (
     QED,
     SCScore,
@@ -31,7 +31,7 @@ from Utility.hyperparams import OPTIMIZER_FACTORY
 from Utility.search import SamplingSearch
 
 
-class Reinforce_base(pl.LightningModule):
+class Reinforce_Base(pl.LightningModule):
     """
     Pipeline to reproduce the results using pytorch_lightning of the paper
     Data-driven molecular design for discovery and synthesis of novel ligands:
@@ -45,37 +45,31 @@ class Reinforce_base(pl.LightningModule):
             "--mol_model_path",
             type=str,
             help="Path to chemistry model",
-            default="paccmann_chemistry/checkpoint/",
+            default="ChemVAE/checkpoint/",
         )
         parser.add_argument(
             "--protein_model_path",
             type=str,
             help="Path to protein model",
-            default="paccmann_omics/checkpoint/",
+            default="ProtVAE/checkpoint/",
         )
         parser.add_argument(
             "--affinity_model_path",
             type=str,
             help="Path to pretrained affinity model",
-            default="paccmann_predictor/checkpoint/",
+            default="Predictor/checkpoint/",
         )
         parser.add_argument(
             "--params_path",
             type=str,
             help="Model params json file directory",
-            default="Config/conditional_generator.json",
+            default="Config/Reinforce.json",
         )
         parser.add_argument(
             "--unbiased_predictions_path",
             type=str,
             help="Path to folder with aff. preds for 3000 mols from unbiased generator",
-            default="data/training/unbiased_predictions",
-        )
-        parser.add_argument(
-            "--fig_save_path",
-            type=str,
-            help="Path to save result figure.",
-            default="binding_images/results/",
+            default="/raid/PaccMann_sarscov2/data/training/unbiased_predictions",
         )
         parser.add_argument(
             "--tox21_path",
@@ -114,7 +108,6 @@ class Reinforce_base(pl.LightningModule):
         params_path,
         test_protein_id,
         unbiased_predictions_path,
-        fig_save_path,
         tox21_path=None,
         organdb_path=None,
         site=None,
@@ -122,10 +115,9 @@ class Reinforce_base(pl.LightningModule):
         sider_path=None,
         **kwargs,
     ):
-        super(Reinforce_base, self).__init__()
+        super(Reinforce_Base, self).__init__()
         # Default setting
         self.project_path = project_path
-        self.fig_save_path = project_path + fig_save_path
         # Read the parameters json file
         self.params = dict()
         with open(params_path) as f:
@@ -150,41 +142,41 @@ class Reinforce_base(pl.LightningModule):
                 # json still has presedence
                 self.params[kwargs] = project_path + args
         # Restore ProtVAE model
-        protein_model = ProtVAE.load_from_checkpoint(
+        protein_model = ProtVAE_Module.load_from_checkpoint(
             os.path.join(
-                project_path + protein_model_path, "paccmann_omics_best_loss-v2.ckpt"
+                project_path + protein_model_path, "ProtVAE.ckpt"
             ),
-            params_filepath="Config/omics.json",
+            params_filepath="Config/ProtVAE.json",
         )
         self.encoder = protein_model.encoder
         # Restore ChemVAE model (only use decoder)
-        chemistry_model = ChemVAE.load_from_checkpoint(
+        chemistry_model = ChemVAE_Module.load_from_checkpoint(
             os.path.join(
-                project_path + mol_model_path, "paccmann_chemistry_best_loss-v2.ckpt"
+                project_path + mol_model_path, "ChemVAE.ckpt"
             ),
             project_filepath=project_path,
-            params_filepath="Config/selfies.json",
-            smiles_language_filepath="language/selfies_language.pkl",
+            params_filepath="Config/ChemVAE.json",
+            smiles_language_filepath="Config/selfies_language.pkl",
         )
         self.decoder = chemistry_model.decoder
         # Load smiles languages for decoder
         decoder_smiles_language = SMILESLanguage.load(
-            os.path.join(project_path, "language/selfies_language.pkl")
+            os.path.join(project_path, "Config/selfies_language.pkl")
         )
         self.decoder._associate_language(decoder_smiles_language)
         # Restore affinity predictor
-        self.predictor = BimodalMCA_lightning.load_from_checkpoint(
+        self.predictor = Predictor_Module.load_from_checkpoint(
             os.path.join(
-                project_path + affinity_model_path, "paccmann_predictor_best_loss.ckpt"
+                project_path + affinity_model_path, "Predictor.ckpt"
             ),
-            params_filepath="Config/affinity.json",
+            params_filepath="Config/Predictor.json",
         )
         # Load smiles and protein languages for predictor
         predictor_smiles_language = SMILESLanguage.load(
-            os.path.join(project_path, "language/smiles_language.pkl")
+            os.path.join(project_path, "Config/smiles_language.pkl")
         )
         predictor_protein_language = ProteinLanguage.load(
-            os.path.join(project_path, "language/protein_language.pkl")
+            os.path.join(project_path, "Config/protein_language.pkl")
         )
         self.predictor._associate_language(predictor_smiles_language)
         self.predictor._associate_language(predictor_protein_language)
@@ -199,7 +191,7 @@ class Reinforce_base(pl.LightningModule):
         )
         # Load protein sequence data for protein test name
         protein_dataset = ProteinDataset(
-            project_path + protein_data_path, test_protein_id
+            protein_data_path, test_protein_id
         )
         self.protein_df = protein_dataset.origin_protein_df
         # Specifies the baseline model used for comparison
@@ -207,7 +199,7 @@ class Reinforce_base(pl.LightningModule):
         self.unbiased_preds = np.array(
             pd.read_csv(
                 os.path.join(
-                    project_path + unbiased_predictions_path,
+                    unbiased_predictions_path,
                     self.protein_test_name + ".csv",
                 )
             )["affinity"].values
@@ -258,7 +250,6 @@ class Reinforce_base(pl.LightningModule):
         self.scscore = SCScore()
         self.esol = ESOL()
         self.sas = SAS()
-        self.lipinski = Lipinski()
         self.qed_weight = params.get("qed_weight", 0.0)
         self.scscore_weight = params.get("scscore_weight", 0.0)
         self.esol_weight = params.get("esol_weight", 0.0)
@@ -266,11 +257,11 @@ class Reinforce_base(pl.LightningModule):
         if self.tox21_weight > 0.0:
             self.tox21 = Tox21(
                 project_path=self.project_path,
-                params_path="Config/toxsmi.json",
+                params_path="Config/Toxicity.json",
                 model_path=params.get(
                     "tox21_path", os.path.join("..", "data", "models", "Tox21")
                 )
-                + "paccmann_toxsmi_best_loss-v3.ckpt",
+                + "Toxicity.ckpt",
                 device=self.device,
             )
             self.tox21.model.to(self.device)
@@ -280,7 +271,7 @@ class Reinforce_base(pl.LightningModule):
         if self.organdb_weight > 0.0:
             self.organdb = OrganDB(
                 self.project_path,
-                params_path="Config/toxsmi.json",
+                params_path="Config/Toxicity.json",
                 model_path=params.get(
                     "organdb_path", os.path.join("..", "data", "models", "OrganDB")
                 ),
@@ -294,7 +285,7 @@ class Reinforce_base(pl.LightningModule):
         if self.clintox_weight > 0.0:
             self.clintox = ClinTox(
                 project_path=self.project_path,
-                params_path="Config/toxsmi.json",
+                params_path="Config/Toxicity.json",
                 model_path=params.get(
                     "clintox_path", os.path.join("..", "data", "models", "ClinTox")
                 ),
@@ -307,7 +298,7 @@ class Reinforce_base(pl.LightningModule):
         if self.sider_weight > 0.0:
             self.sider = SIDER(
                 self.project_path,
-                params_path="Config/toxsmi.json",
+                params_path="Config/Toxicity.json",
                 model_path=params.get(
                     "sider_path", os.path.join("..", "data", "models", "Siders")
                 ),

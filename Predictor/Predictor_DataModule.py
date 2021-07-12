@@ -10,7 +10,7 @@ from pytoda.smiles.smiles_language import SMILESLanguage
 from torch.utils.data.dataloader import DataLoader
 
 
-class DrugAffinity_lightning(pl.LightningDataModule):
+class Predictor_DataModule(pl.LightningDataModule):
     @classmethod
     def add_argparse_args(
         cls, parent_parser: ArgumentParser, **kwargs
@@ -57,7 +57,7 @@ class DrugAffinity_lightning(pl.LightningDataModule):
         *args,
         **kwargs,
     ):
-        super(DrugAffinity_lightning, self).__init__()
+        super(Predictor_DataModule, self).__init__()
         self.train_affinity_filepath = project_filepath + train_affinity_filepath
         self.test_affinity_filepath = project_filepath + test_affinity_filepath
         self.protein_filepath = project_filepath + protein_filepath
