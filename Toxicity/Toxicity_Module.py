@@ -28,7 +28,7 @@ from Utility.layers import (
 )
 
 
-class MCA_lightning(pl.LightningModule):
+class Toxicity_Module(pl.LightningModule):
     """
     Multiscale Convolutional Attentive Encoder.
     This is the MCA model similiar to the one presented in publication in
@@ -89,7 +89,7 @@ class MCA_lightning(pl.LightningModule):
         }
         ```
         """
-        super(MCA_lightning, self).__init__()
+        super(Toxicity_Module, self).__init__()
         self.params_filepath = params_filepath
 
         # Model Parameter

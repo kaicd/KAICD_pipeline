@@ -75,8 +75,7 @@ with open(args.params_filepath, "w") as f:
 
 # Define dataset and model
 net = ChemVAE_Module(**vars(args))
-print(net.device)
-data = ChemVAE_DataModule(**vars(args))
+data = ChemVAE_DataModule(device=net.device, **vars(args))
 
 # Define pytorch-lightning Trainer multiple callbacks
 on_best_loss = ModelCheckpoint(

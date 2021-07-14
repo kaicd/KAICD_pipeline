@@ -8,7 +8,7 @@ from pytoda.smiles.smiles_language import SMILESLanguage
 from torch.utils.data.dataloader import DataLoader
 
 
-class Toxicity_lightning(pl.LightningDataModule):
+class Toxicity_DataModule(pl.LightningDataModule):
     @classmethod
     def add_argparse_args(
         cls, parent_parser: ArgumentParser, **kwargs
@@ -53,7 +53,7 @@ class Toxicity_lightning(pl.LightningDataModule):
         *args,
         **kwargs,
     ):
-        super(Toxicity_lightning, self).__init__()
+        super(Toxicity_DataModule, self).__init__()
         self.train_score_filepath = project_filepath + train_score_filepath
         self.test_score_filepath = project_filepath + test_score_filepath
         self.smi_filepath = project_filepath + smi_filepath

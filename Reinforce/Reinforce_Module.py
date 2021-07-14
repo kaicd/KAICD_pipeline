@@ -188,7 +188,6 @@ class Reinforce_Module(Reinforce_Base):
                 "SCScore": self.gen_mols_scscore,
                 "ESOL": self.gen_mols_esol,
                 "SAS": self.gen_mols_sas,
-                "Lipinski": self.gen_mols_lipinski
             }
         )
         df.to_csv(
