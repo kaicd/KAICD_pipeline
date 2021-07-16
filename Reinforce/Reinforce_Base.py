@@ -263,6 +263,7 @@ class Reinforce_Base(pl.LightningModule):
                 )
                 + "Toxicity.ckpt",
                 device=self.device,
+                reward_type="raw",
             )
             self.tox21.model.to(self.device)
         else:

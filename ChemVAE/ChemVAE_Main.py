@@ -43,7 +43,7 @@ parser.add_argument(
 
 # Trainer args
 parser = pl.Trainer.add_argparse_args(parser)
-parser.set_defaults(gpus=1, accelerator="ddp", max_epochs=50)
+parser.set_defaults(gpus=8, accelerator="ddp", max_epochs=50)
 
 # Dataset args
 parser = ChemVAE_DataModule.add_argparse_args(parser)
