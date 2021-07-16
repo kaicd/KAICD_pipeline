@@ -39,7 +39,7 @@ or
 (paccmann_sarscov2) $ PYTHONPATH='./' python ./ChemVAE/ChemVAE_Main.py
 ```
 
-### protein VAE
+### protein VAE(Pytorch-Lightning)
 ```console
 (paccmann_sarscov2) $ PYTHONPATH='./' python ./ProtVAE/ProtVAE_Main.py
 ```
