@@ -75,7 +75,7 @@ trainer = pl.Trainer.from_argparse_args(
         project=args.project,
         name=wandb_name,
         group=wandb_group,
-        log_model=True
+        log_model=True,
     ),
     checkpoint_callback=[on_best_roc_auc],
 )

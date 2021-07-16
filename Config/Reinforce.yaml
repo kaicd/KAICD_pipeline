@@ -1,0 +1,13 @@
+mol_model_path: "/raid/paccmann-covid/models/SELFIESVAE"
+protein_model_path: "/raid/paccmann-covid/models/ProteinVAE"
+affinity_model_path: "/raid/paccmann-covid/models/affinity"
+protein_data_path: "/raid/paccmann-covid/data/training/merged_sequence_encoding/uniprot_covid-19.csv"
+params_path: "Config/Reinforce.json"
+model_name: "paccmann_sarscov2"
+test_protein_id: 35
+unbiased_predictions_path: "/raid/paccmann-covid/data/training/unbiased_predictions"
+tox21_path: "/raid/paccmann-covid/models/Tox21"
+organdb_path:
+site:
+clintox_path:
+sider_path:
