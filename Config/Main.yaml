@@ -1,0 +1,3 @@
+wandb:
+  entity: "kaicd"
+  project: "PaccMann_sarscov2_Pipeline_Test"

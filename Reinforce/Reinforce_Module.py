@@ -192,7 +192,10 @@ class Reinforce_Module(Reinforce_Base):
         )
         df.to_csv(
             os.path.join(
-                "/raid", "PaccMann_sarscov2", "results", self.protein_test_name + "_generated.csv"
+                "/raid",
+                "PaccMann_sarscov2",
+                "results",
+                self.protein_test_name + "_generated.csv",
             )
         )
         self.logger.experiment.log({"Generate Molecules": [Table(dataframe=df)]})
