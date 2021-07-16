@@ -16,7 +16,25 @@ data
 This is around **6GB** of data, required for pretaining multiple models.
 Also, the workload required to run the full pipeline is intensive and might not be straightforward to run all the steps on a desktop laptop.
 
-### SELFIES VAE(Pytorch-Lightning)
+## Main(Must enter the model name)
+```console
+(paccmann_sarscov2) $ PYTHONPATH='./' python Main.py --model Reinforce
+or
+(paccmann_sarscov2) $ PYTHONPATH='./' python Main.py --model ChemVAE
+or
+(paccmann_sarscov2) $ PYTHONPATH='./' python Main.py --model ProtVAE
+or
+(paccmann_sarscov2) $ PYTHONPATH='./' python Main.py --model Predictor
+or
+(paccmann_sarscov2) $ PYTHONPATH='./' python Main.py --model Toxicity
+```
+
+### reinforce generator(Pytorch-Lightning)
+```console
+(paccmann_sarscov2) $ PYTHONPATH='./' python ./Reinforce/Reinforce_Main.py
+```
+
+### selfies VAE(Pytorch-Lightning)
 ```console
 (paccmann_sarscov2) $ PYTHONPATH='./' python ./ChemVAE/ChemVAE_Main.py
 ```
@@ -34,20 +52,4 @@ Also, the workload required to run the full pipeline is intensive and might not 
 ### toxicity predictor(Pytorch-Lightning)
 ```console
 (paccmann_sarscov2) $ PYTHONPATH='./' python ./Toxicity/Toxicity_Main.py
-```
-
-# PaccMann_rl generator(Pytorch-Lightning)
-```console
-(paccmann_sarscov2) $ PYTHONPATH='./' python ./Reinforce/Reinforce_Main.py
-```
-
-### SMILESDataset data to SMILES
-```console
-smiles_batch = []
-
-for data in batch:
-  mol = crop_start_stop(data, self.smiles_language)
-  mol = self.smiles_language.token_indexes_to_smiles(mol)
-  mol = self.smiles_language.selfies_to_smiles(mol) if self.selfies else mol
-  smiles_batch.append(mol)
 ```
