@@ -14,7 +14,7 @@ from pytoda.smiles.transforms import (
 )
 from pytoda.transforms import Compose, ToTensor
 
-from Toxicity.Toxicity_Module import MCA_lightning
+from Toxicity.Toxicity_Module import Toxicity_Module
 
 
 class DrugEvaluator:
@@ -46,7 +46,7 @@ class DrugEvaluator:
         )
         self.transforms = self.compose_smiles_transforms(params)
         # Initialize and restore model weights
-        self.model = MCA_lightning.load_from_checkpoint(
+        self.model = Toxicity_Module.load_from_checkpoint(
             os.path.join(project_path, model_path), params_filepath=params_path
         )
         self.model.eval()

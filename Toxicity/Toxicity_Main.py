@@ -5,8 +5,8 @@ import pytorch_lightning as pl
 from pytorch_lightning import loggers
 from pytorch_lightning.callbacks import ModelCheckpoint
 
-from Toxicity_Module import MCA_lightning
-from Toxicity_DataModule import Toxicity_lightning
+from Toxicity_Module import Toxicity_Module
+from Toxicity_DataModule import Toxicity_DataModule
 
 parser = argparse.ArgumentParser()
 
@@ -45,7 +45,7 @@ parser = pl.Trainer.add_argparse_args(parser)
 parser.set_defaults(gpus=1, accelerator="ddp", max_epochs=200)
 
 # Dataset args
-parser = Toxicity_lightning.add_argparse_args(parser)
+parser = Toxicity_DataModule.add_argparse_args(parser)
 args, _ = parser.parse_known_args()
 pl.seed_everything(args.seed)
 
@@ -59,8 +59,8 @@ if params.get("embedding", "learned") == "pretrained":
         json.dump(params, f)
 
 # Define dataset and model
-net = MCA_lightning(**vars(args))
-data = Toxicity_lightning(device=net.device, **vars(args))
+net = Toxicity_Module(**vars(args))
+data = Toxicity_DataModule(device=net.device, **vars(args))
 
 # Define pytorch-lightning Trainer multiple callbacks
 on_best_loss = ModelCheckpoint(

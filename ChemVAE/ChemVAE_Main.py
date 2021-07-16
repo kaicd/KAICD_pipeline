@@ -43,7 +43,7 @@ parser.add_argument(
 
 # Trainer args
 parser = pl.Trainer.add_argparse_args(parser)
-parser.set_defaults(gpus=1, accelerator="ddp", max_epochs=50)
+parser.set_defaults(gpus=8, accelerator="ddp", max_epochs=50)
 
 # Dataset args
 parser = ChemVAE_DataModule.add_argparse_args(parser)
@@ -75,8 +75,7 @@ with open(args.params_filepath, "w") as f:
 
 # Define dataset and model
 net = ChemVAE_Module(**vars(args))
-print(net.device)
-data = ChemVAE_DataModule(**vars(args))
+data = ChemVAE_DataModule(device=net.device, **vars(args))
 
 # Define pytorch-lightning Trainer multiple callbacks
 on_best_loss = ModelCheckpoint(

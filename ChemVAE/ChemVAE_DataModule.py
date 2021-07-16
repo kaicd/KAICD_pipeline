@@ -38,6 +38,7 @@ class ChemVAE_DataModule(pl.LightningDataModule):
         test_smiles_filepath,
         smiles_language_filepath,
         params_filepath,
+        device,
         *args,
         **kwargs,
     ):
@@ -49,6 +50,7 @@ class ChemVAE_DataModule(pl.LightningDataModule):
         self.params_filepath = params_filepath
         self.smiles_language = SMILESLanguage.load(self.smiles_language_filepath)
         self.params = {}
+        self.device = device
 
         # Process parameter file
         with open(self.params_filepath) as f:

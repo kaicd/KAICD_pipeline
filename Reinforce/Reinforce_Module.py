@@ -27,7 +27,7 @@ class Reinforce_Module(Reinforce_Base):
         # Define for save result(good molecules!) in dataframe
         self.best_biased_ratio = 0
         self.gen_mols, self.gen_prot, self.gen_affinity, self.toxes = [], [], [], []
-        self.non_toxic_useful_smiles, self.non_toxic_useful_preds = [], []
+        self.low_toxic_useful_smiles, self.low_toxic_useful_preds = [], []
         (
             self.gen_mols_qed,
             self.gen_mols_scscore,
@@ -110,9 +110,9 @@ class Reinforce_Module(Reinforce_Base):
             # Save toxicity of effective molecules
             tox = self.tox21(s)
             self.toxes.append(tox)
-            if tox == 1.0:
-                self.non_toxic_useful_smiles.append(s)
-                self.non_toxic_useful_preds.append(p)
+            if tox > 0.5:
+                self.low_toxic_useful_smiles.append(s)
+                self.low_toxic_useful_preds.append(p)
             # Save property of effective molecules
             self.gen_mols_qed.append(self.qed(s))
             self.gen_mols_scscore.append(self.scscore(s))
@@ -133,9 +133,9 @@ class Reinforce_Module(Reinforce_Base):
         )
         biased_ratio = np.round((np.sum(preds > 0.5) / len(preds)) * 100, 1)
         all_toxes = np.array([self.tox21(s) for s in smiles])
-        tox_ratio = np.round((np.sum(all_toxes == 1.0) / len(all_toxes)) * 100, 1)
+        tox_ratio = np.round((np.sum(all_toxes > 0.5) / len(all_toxes)) * 100, 1)
         self.log("efficacy_ratio", biased_ratio)
-        self.log("non_tox_ratio", tox_ratio)
+        self.log("low_tox_ratio", tox_ratio)
         # Log distribution plot
         if self.best_biased_ratio <= biased_ratio:
             self.logger.experiment.log(
@@ -157,14 +157,14 @@ class Reinforce_Module(Reinforce_Base):
             )
             self.best_biased_ratio = biased_ratio
         # Log top 4 generate molecule
-        idx = np.argsort(self.non_toxic_useful_preds)[::-1]
+        idx = np.argsort(self.low_toxic_useful_preds)[::-1]
         lead = []
         captions = []
         for i in idx:
-            mol = Chem.MolFromSmiles(self.non_toxic_useful_smiles[i])
-            if mol:
+            mol = Chem.MolFromSmiles(self.low_toxic_useful_smiles[i])
+            if mol and len(self.low_toxic_useful_smiles[i]) >= 20:
                 lead.append(mol)
-                captions.append(str(self.non_toxic_useful_preds[i]))
+                captions.append(str(self.low_toxic_useful_preds[i]))
                 if len(lead) == 4:
                     break
 
@@ -188,7 +188,6 @@ class Reinforce_Module(Reinforce_Base):
                 "SCScore": self.gen_mols_scscore,
                 "ESOL": self.gen_mols_esol,
                 "SAS": self.gen_mols_sas,
-                "Lipinski": self.gen_mols_lipinski
             }
         )
         df.to_csv(
