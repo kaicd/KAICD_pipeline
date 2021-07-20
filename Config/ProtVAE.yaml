@@ -1,5 +1,5 @@
 project_filepath: "/raid/PaccMann_sarscov2/"
-save_filepath: "/raid/PaccMann_sarscov2/paccmann_omics/checkpoint/"
+save_filepath: "paccmann_omics/checkpoint/"
 params_filepath: "Config/ProtVAE.json"
 train_filepath: "data/pretraining/ProteinVAE/tape_encoded/train_representation.csv"
 test_filepath: "data/pretraining/ProteinVAE/tape_encoded/val_representation.csv"

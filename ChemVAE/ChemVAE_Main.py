@@ -23,7 +23,7 @@ parser.add_argument(
 parser.add_argument(
     "--save_filepath",
     type=str,
-    default="/raid/PaccMann_sarscov2/paccmann_chemistry/checkpoint/",
+    default="paccmann_chemistry/checkpoint/",
 )
 parser.add_argument("--seed", type=int, default=42)
 
@@ -79,14 +79,14 @@ data = ChemVAE_DataModule(device=net.device, **vars(args))
 
 # Define pytorch-lightning Trainer multiple callbacks
 on_best_loss = ModelCheckpoint(
-    dirpath=args.save_filepath,
+    dirpath=args.project_filepath + args.save_filepath,
     filename="paccmann_chemistry_best_loss",
     monitor="val_loss",
     save_top_k=1,
     mode="min",
 )
 on_best_kl_div = ModelCheckpoint(
-    dirpath=args.save_filepath,
+    dirpath=args.project_filepath + args.save_filepath,
     filename="paccmann_chemistry_best_kl_div",
     monitor="val_kl_div",
     save_top_k=1,

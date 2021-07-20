@@ -1,5 +1,5 @@
 project_filepath: "/raid/PaccMann_sarscov2/"
-save_filepath: "/raid/PaccMann_sarscov2/paccmann_chemistry/checkpoint/"
+save_filepath: "paccmann_chemistry/checkpoint/"
 smiles_language_filepath: "data/pretraining/language_models/selfies_language.pkl"
 params_filepath: "Config/ChemVAE.json"
 train_smiles_filepath: "data/pretraining/SELFIESVAE/train_chembl_22_clean_1576904_sorted_std_final.smi"

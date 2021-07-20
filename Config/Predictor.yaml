@@ -1,5 +1,5 @@
 project_filepath: "/raid/PaccMann_sarscov2/"
-save_filepath: "/raid/PaccMann_sarscov2/paccmann_predictor/checkpoint/"
+save_filepath: "paccmann_predictor/checkpoint/"
 smiles_language_filepath: "data/pretraining/language_models/smiles_language_chembl_gdsc_ccle_tox21_zinc_organdb_bindingdb.pkl"
 protein_language_filepath: "data/pretraining/language_models/protein_language_bindingdb.pkl"
 params_filepath: "Config/Predictor.json"
