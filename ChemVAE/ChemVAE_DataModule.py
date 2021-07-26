@@ -28,6 +28,18 @@ class ChemVAE_DataModule(pl.LightningDataModule):
             default="data/pretraining/SELFIESVAE/test_chembl_22_clean_1576904_sorted_std_final.smi",
             help="Path to the drug affinity data.",
         )
+        parser.add_argument(
+            "--train_dataset_filepath",
+            type=str,
+            default="preprocessing/ChemVAE_train_dataset_antiviral.pkl",
+            help="Path to the preprocessing drug affinity data.",
+        )
+        parser.add_argument(
+            "--test_dataset_filepath",
+            type=str,
+            default="preprocessing/ChemVAE_test_dataset_antiviral.pkl",
+            help="Path to the preprocessing drug affinity data.",
+        )
 
         return parent_parser
 
@@ -36,6 +48,8 @@ class ChemVAE_DataModule(pl.LightningDataModule):
         project_filepath,
         train_smiles_filepath,
         test_smiles_filepath,
+        train_dataset_filepath,
+        test_dataset_filepath,
         smiles_language_filepath,
         params_filepath,
         device,
@@ -43,9 +57,10 @@ class ChemVAE_DataModule(pl.LightningDataModule):
         **kwargs,
     ):
         super(ChemVAE_DataModule, self).__init__()
-        self.dataset_filepath = project_filepath + "preprocessing/"
         self.train_smiles_filepath = project_filepath + train_smiles_filepath
         self.test_smiles_filepath = project_filepath + test_smiles_filepath
+        self.train_dataset_filepath = project_filepath + train_dataset_filepath
+        self.test_dataset_filepath = project_filepath + test_dataset_filepath
         self.smiles_language_filepath = smiles_language_filepath
         self.params_filepath = params_filepath
         self.smiles_language = SMILESLanguage.load(self.smiles_language_filepath)
@@ -59,14 +74,12 @@ class ChemVAE_DataModule(pl.LightningDataModule):
     def setup(self, stage: Optional[str] = None) -> None:
         smiles_filepath = [self.train_smiles_filepath, self.test_smiles_filepath]
 
-        if osp.exists(
-            self.dataset_filepath + "ChemVAE_train_dataset.pkl"
-        ) and osp.exists(self.dataset_filepath + "ChemVAE_test_dataset.pkl"):
+        if osp.exists(self.train_dataset_filepath) and osp.exists(self.test_dataset_filepath):
             print("Preprocessing file already exists!\nLoading...")
 
-            with open(self.dataset_filepath + "ChemVAE_train_dataset.pkl", "rb") as f:
+            with open(self.train_dataset_filepath, "rb") as f:
                 self.train_dataset = dill.load(f)
-            with open(self.dataset_filepath + "ChemVAE_test_dataset.pkl", "rb") as f:
+            with open(self.test_dataset_filepath, "rb") as f:
                 self.test_dataset = dill.load(f)
             print("Done...!")
         else:
@@ -93,9 +106,9 @@ class ChemVAE_DataModule(pl.LightningDataModule):
                     self.test_dataset = dataset
 
             print("Saving...")
-            with open(self.dataset_filepath + "ChemVAE_train_dataset.pkl", "wb") as f:
+            with open(self.train_dataset_filepath, "wb") as f:
                 dill.dump(self.train_dataset, f)
-            with open(self.dataset_filepath + "ChemVAE_test_dataset.pkl", "wb") as f:
+            with open(self.test_dataset_filepath, "wb") as f:
                 dill.dump(self.test_dataset, f)
             print("Done...!")
 
@@ -133,4 +146,4 @@ class ChemVAE_DataModule(pl.LightningDataModule):
         return self.dataloader(self.train_dataset, shuffle=True)
 
     def val_dataloader(self) -> Union[DataLoader, List[DataLoader]]:
-        return self.dataloader(self.test_dataset, shuffle=True)
+        return self.dataloader(self.test_dataset, shuffle=False)

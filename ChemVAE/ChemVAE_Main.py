@@ -1,3 +1,4 @@
+import os
 import json
 import argparse
 
@@ -13,17 +14,27 @@ parser = argparse.ArgumentParser()
 
 # Project args
 parser.add_argument("--entity", type=str, default="kaicd")
-parser.add_argument("--project", type=str, default="PaccMann_sarscov2")
+parser.add_argument("--project", type=str, default="KAICD_sarscov2")
 parser.add_argument(
     "--project_filepath",
     type=str,
-    default="/raid/PaccMann_sarscov2/",
-    help="Path to the paccmann_sarscov2 project file.",
+    default="/raid/KAICD_sarscov2/",
+    help="Path to the KAICD_sarscov2 project file.",
 )
 parser.add_argument(
     "--save_filepath",
     type=str,
-    default="paccmann_chemistry/checkpoint/",
+    default="ChemVAE/checkpoint/",
+)
+parser.add_argument(
+    "--checkpoint_filepath",
+    type=str,
+    default="ChemVAE/checkpoint/ChemVAE_5M.ckpt"
+)
+parser.add_argument(
+    "--model_name",
+    type=str,
+    default="ChemVAE"
 )
 parser.add_argument("--seed", type=int, default=42)
 
@@ -43,7 +54,7 @@ parser.add_argument(
 
 # Trainer args
 parser = pl.Trainer.add_argparse_args(parser)
-parser.set_defaults(gpus=8, accelerator="ddp", max_epochs=50)
+parser.set_defaults(gpus=1, accelerator="ddp")
 
 # Dataset args
 parser = ChemVAE_DataModule.add_argparse_args(parser)
@@ -77,17 +88,22 @@ with open(args.params_filepath, "w") as f:
 net = ChemVAE_Module(**vars(args))
 data = ChemVAE_DataModule(device=net.device, **vars(args))
 
+# (Optional) Transfer Learning
+ckpt = args.checkpoint_filepath
+if not ckpt == "":
+    net = ChemVAE_Module.load_from_checkpoint(ckpt, **vars(args))
+
 # Define pytorch-lightning Trainer multiple callbacks
 on_best_loss = ModelCheckpoint(
     dirpath=args.project_filepath + args.save_filepath,
-    filename="paccmann_chemistry_best_loss",
+    filename=args.model_name + "_best_loss",
     monitor="val_loss",
     save_top_k=1,
     mode="min",
 )
 on_best_kl_div = ModelCheckpoint(
     dirpath=args.project_filepath + args.save_filepath,
-    filename="paccmann_chemistry_best_kl_div",
+    filename=args.model_name + "_best_kl_div",
     monitor="val_kl_div",
     save_top_k=1,
     mode="min",
@@ -96,9 +112,9 @@ on_best_kl_div = ModelCheckpoint(
 # Define pytorch-lightning Trainer
 trainer = pl.Trainer.from_argparse_args(
     args,
-    max_epochs=params.get("epochs, 100"),
+    max_epochs=params.get("epochs", 100),
     logger=loggers.WandbLogger(
-        entity=args.entity, project=args.project, log_model=True
+        entity=args.entity, project=args.project, name=args.model_name, log_model=True
     ),
     callbacks=[on_best_loss, on_best_kl_div],
 )

@@ -1,12 +1,13 @@
-mol_model_path: "/raid/paccmann-covid/models/SELFIESVAE"
-protein_model_path: "/raid/paccmann-covid/models/ProteinVAE"
-affinity_model_path: "/raid/paccmann-covid/models/affinity"
-protein_data_path: "/raid/paccmann-covid/data/training/merged_sequence_encoding/uniprot_covid-19.csv"
+project_filepath: "./"
+mol_model_path: "ChemVAE/checkpoint/ChemVAE_5M_antiviral.ckpt"
+protein_model_path: "ProtVAE/checkpoint/ProtVAE.ckpt"
+affinity_model_path: "Predictor/checkpoint/Predictor.ckpt"
+protein_data_path: "/raid/KAICD_sarscov2/data/training/merged_sequence_encoding/uniprot_covid-19.csv"
 params_path: "Config/Reinforce.json"
-model_name: "paccmann_sarscov2"
-test_protein_id: 35
-unbiased_predictions_path: "/raid/paccmann-covid/data/training/unbiased_predictions"
-tox21_path: "/raid/paccmann-covid/models/Tox21"
+model_name: "pKAICD_sarscov2"
+test_protein_id: "23"
+unbiased_predictions_path: "/raid/KAICD_sarscov2/data/training/unbiased_predictions"
+tox21_path: "Toxicity/checkpoint/Toxicity.ckpt"
 organdb_path:
 site:
 clintox_path:
