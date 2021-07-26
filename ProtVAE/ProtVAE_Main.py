@@ -11,17 +11,22 @@ parser = argparse.ArgumentParser()
 
 # Project args
 parser.add_argument("--entity", type=str, default="kaicd")
-parser.add_argument("--project", type=str, default="PaccMann_sarscov2")
+parser.add_argument("--project", type=str, default="KAICD_sarscov2")
 parser.add_argument(
     "--project_filepath",
     type=str,
-    default="/raid/PaccMann_sarscov2/",
-    help="Path to the paccmann_sarscov2 project file.",
+    default="/raid/KAICD_sarscov2/",
+    help="Path to the KAICD_sarscov2 project file.",
 )
 parser.add_argument(
     "--save_filepath",
     type=str,
-    default="paccmann_omics/checkpoint/",
+    default="ProtVAE/checkpoint/",
+)
+parser.add_argument(
+    "--model_name",
+    type=str,
+    default="ProtVAE"
 )
 parser.add_argument("--seed", type=int, default=42)
 parser.add_argument(
@@ -47,21 +52,21 @@ data = ProtVAE_DataModule(**vars(args))
 # Define pytorch-lightning Trainer multiple callbacks
 on_best_loss = ModelCheckpoint(
     dirpath=args.project_filepath + args.save_filepath,
-    filename="paccmann_omics_best_loss",
+    filename=args.model_name + "_best_loss",
     monitor="val_loss",
     save_top_k=1,
     mode="min",
 )
 on_best_rec = ModelCheckpoint(
     dirpath=args.project_filepath + args.save_filepath,
-    filename="paccmann_omics_best_rec",
+    filename=args.model_name + "_best_rec",
     monitor="val_rec",
     save_top_k=1,
     mode="min",
 )
 on_best_kld = ModelCheckpoint(
     dirpath=args.project_filepath + args.save_filepath,
-    filename="paccmann_omics_best_kld",
+    filename=args.model_name + "_best_kld",
     monitor="val_kld",
     save_top_k=1,
     mode="min",
@@ -71,7 +76,7 @@ on_best_kld = ModelCheckpoint(
 trainer = pl.Trainer.from_argparse_args(
     args,
     logger=loggers.WandbLogger(
-        entity=args.entity, project=args.project, log_model=True
+        entity=args.entity, project=args.project, name=args.model_name, log_model=True
     ),
     callbacks=[on_best_loss, on_best_rec, on_best_kld],
 )

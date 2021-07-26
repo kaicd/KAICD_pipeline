@@ -19,25 +19,25 @@ class Predictor_DataModule(pl.LightningDataModule):
         parser.add_argument(
             "--train_affinity_filepath",
             type=str,
-            default="data/pretraining/affinity_predictor/filtered_train_binding_data.csv",
+            default="data/pretraining/Predictor/filtered_train_binding_data.csv",
             help="Path to the drug affinity data.",
         )
         parser.add_argument(
             "--test_affinity_filepath",
             type=str,
-            default="data/pretraining/affinity_predictor/filtered_val_binding_data.csv",
+            default="data/pretraining/Predictor/filtered_val_binding_data.csv",
             help="Path to the drug affinity data.",
         )
         parser.add_argument(
             "--protein_filepath",
             type=str,
-            default="data/pretraining/affinity_predictor/sequences.smi",
+            default="data/pretraining/Predictor/sequences.smi",
             help="Path to the protein profile data.",
         )
         parser.add_argument(
             "--smi_filepath",
             type=str,
-            default="data/pretraining/affinity_predictor/filtered_ligands.smi",
+            default="data/pretraining/Predictor/filtered_ligands.smi",
             help="Path to the SMILES data.",
         )
 

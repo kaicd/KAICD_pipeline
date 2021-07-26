@@ -14,17 +14,17 @@ parser = argparse.ArgumentParser()
 
 # Project args
 parser.add_argument("--entity", type=str, default="kaicd")
-parser.add_argument("--project", type=str, default="PaccMann_sarscov2")
+parser.add_argument("--project", type=str, default="KAICD_sarscov2")
 parser.add_argument(
     "--project_filepath",
     type=str,
-    default="/raid/PaccMann_sarscov2/",
-    help="Path to the paccmann_sarscov2 project file.",
+    default="/raid/KAICD_sarscov2/",
+    help="Path to the KAICD_sarscov2 project file.",
 )
 parser.add_argument(
     "--save_filepath",
     type=str,
-    default="/raid/PaccMann_sarscov2/paccmann_predictor/checkpoint/",
+    default="Predictor/checkpoint/",
 )
 parser.add_argument("--seed", type=int, default=42)
 
@@ -46,6 +46,11 @@ parser.add_argument(
     type=str,
     default="Config/Predictor.json",
     help="Path to the parameter file.",
+)
+parser.add_argument(
+    "--model_name",
+    type-str,
+    default="Predictor"
 )
 
 # Trainer args
@@ -82,22 +87,22 @@ data = Predictor_DataModule(device=net.device, **vars(args))
 
 # Define pytorch-lightning Trainer multiple callbacks
 on_best_loss = ModelCheckpoint(
-    dirpath=args.save_filepath,
-    filename="paccmann_predictor_best_loss",
+    dirpath=args.project_filepath + args.save_filepath,
+    filename=args.model_name + "_best_loss",
     monitor="val_loss",
     save_top_k=1,
     mode="min",
 )
 on_best_roc_auc = ModelCheckpoint(
-    dirpath=args.save_filepath,
-    filename="paccmann_predictor_best_roc_auc",
+    dirpath=args.project_filepath + args.save_filepath,
+    filename=args.model_name + "_best_roc_auc",
     monitor="val_roc_auc",
     save_top_k=1,
     mode="max",
 )
 on_best_avg_precision_score = ModelCheckpoint(
-    dirpath=args.save_filepath,
-    filename="paccmann_predictor_best_avg_prec",
+    dirpath=args.project_filepath + args.save_filepath,
+    filename=args.model_name + "_best_avg_prec",
     monitor="val_avg_precision_score",
     save_top_k=1,
     mode="max",
@@ -109,6 +114,7 @@ trainer = pl.Trainer.from_argparse_args(
     logger=loggers.WandbLogger(
         entity=args.entity,
         project=args.project,
+        name=args.model_name,
         log_model=True,
     ),
     callbacks=[on_best_loss, on_best_roc_auc, on_best_avg_precision_score],

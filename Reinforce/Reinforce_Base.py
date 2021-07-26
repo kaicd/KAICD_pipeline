@@ -17,11 +17,11 @@ from ChemVAE.ChemVAE_Module import ChemVAE_Module
 from ProtVAE.ProtVAE_Module import ProtVAE_Module
 from Predictor.Predictor_Module import Predictor_Module
 from Utility.drug_evaluators import (
+    AromaticRing,
     QED,
     SCScore,
     ESOL,
     SAS,
-    Lipinski,
     Tox21,
     SIDER,
     ClinTox,
@@ -69,7 +69,7 @@ class Reinforce_Base(pl.LightningModule):
             "--unbiased_predictions_path",
             type=str,
             help="Path to folder with aff. preds for 3000 mols from unbiased generator",
-            default="/raid/PaccMann_sarscov2/data/training/unbiased_predictions",
+            default="/raid/KAICD_sarscov2/data/training/unbiased_predictions",
         )
         parser.add_argument(
             "--tox21_path",
@@ -143,13 +143,17 @@ class Reinforce_Base(pl.LightningModule):
                 self.params[kwargs] = project_path + args
         # Restore ProtVAE model
         protein_model = ProtVAE_Module.load_from_checkpoint(
-            os.path.join(project_path + protein_model_path, "ProtVAE.ckpt"),
+            os.path.join(
+                project_path + protein_model_path
+            ),
             params_filepath="Config/ProtVAE.json",
         )
         self.encoder = protein_model.encoder
         # Restore ChemVAE model (only use decoder)
         chemistry_model = ChemVAE_Module.load_from_checkpoint(
-            os.path.join(project_path + mol_model_path, "ChemVAE.ckpt"),
+            os.path.join(
+                project_path + mol_model_path
+            ),
             project_filepath=project_path,
             params_filepath="Config/ChemVAE.json",
             smiles_language_filepath="Config/selfies_language.pkl",
@@ -162,7 +166,9 @@ class Reinforce_Base(pl.LightningModule):
         self.decoder._associate_language(decoder_smiles_language)
         # Restore affinity predictor
         self.predictor = Predictor_Module.load_from_checkpoint(
-            os.path.join(project_path + affinity_model_path, "Predictor.ckpt"),
+            os.path.join(
+                project_path + affinity_model_path
+            ),
             params_filepath="Config/Predictor.json",
         )
         # Load smiles and protein languages for predictor
@@ -184,7 +190,9 @@ class Reinforce_Base(pl.LightningModule):
             self.predictor.protein_language.padding_index,
         )
         # Load protein sequence data for protein test name
-        protein_dataset = ProteinDataset(protein_data_path, test_protein_id)
+        protein_dataset = ProteinDataset(
+            protein_data_path, test_protein_id
+        )
         self.protein_df = protein_dataset.origin_protein_df
         # Specifies the baseline model used for comparison
         self.protein_test_name = self.protein_df.iloc[test_protein_id].name
@@ -238,13 +246,16 @@ class Reinforce_Base(pl.LightningModule):
 
     def update_params(self, params):
         # Parameters for reward function
+        self.ring = AromaticRing()
         self.qed = QED()
         self.scscore = SCScore()
         self.esol = ESOL()
         self.sas = SAS()
+        self.ring_weight = params.get("ring_weight", 0.0)
         self.qed_weight = params.get("qed_weight", 0.0)
         self.scscore_weight = params.get("scscore_weight", 0.0)
         self.esol_weight = params.get("esol_weight", 0.0)
+        self.sas_weight = params.get("sas_weight", 0.0)
         self.tox21_weight = params.get("tox21_weight", 0.5)
         if self.tox21_weight > 0.0:
             self.tox21 = Tox21(
@@ -252,8 +263,7 @@ class Reinforce_Base(pl.LightningModule):
                 params_path="Config/Toxicity.json",
                 model_path=params.get(
                     "tox21_path", os.path.join("..", "data", "models", "Tox21")
-                )
-                + "Toxicity.ckpt",
+                ),
                 device=self.device,
                 reward_type="raw",
             )
@@ -304,6 +314,16 @@ class Reinforce_Base(pl.LightningModule):
 
         def tox_f(s):
             x = 0
+            if self.ring_weight > 0.0:
+                x += self.ring_weight * self.ring(s)
+            if self.qed_weight > 0.0:
+                x += self.qed_weight * self.qed(s)
+            if self.scscore_weight > 0.0:
+                x += self.scscore_weight * self.scscore(s)
+            if self.esol_weight > 0.0:
+                x += self.esol_weight * self.esol(s)
+            if self.sas_weight > 0.0:
+                x += self.sas_weight * self.sas(s)
             if self.tox21_weight > 0.0:
                 x += self.tox21_weight * self.tox21(s)
             if self.sider_weight > 0.0:

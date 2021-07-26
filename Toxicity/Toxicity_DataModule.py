@@ -17,19 +17,19 @@ class Toxicity_DataModule(pl.LightningDataModule):
         parser.add_argument(
             "--train_score_filepath",
             type=str,
-            default="data/pretraining/toxicity_predictor/tox21_train.csv",
+            default="data/pretraining/Toxicity/tox21_train.csv",
             help="Path to the training toxicity scores(.csv)",
         )
         parser.add_argument(
             "--test_score_filepath",
             type=str,
-            default="data/pretraining/toxicity_predictor/tox21_test.csv",
+            default="data/pretraining/Toxicity/tox21_test.csv",
             help="Path to the test toxicity scores(.csv)",
         )
         parser.add_argument(
             "--smi_filepath",
             type=str,
-            default="data/pretraining/toxicity_predictor/tox21.smi",
+            default="data/pretraining/Toxicity/tox21.smi",
             help="Path to the SMILES data(.smi)",
         )
         parser.add_argument(

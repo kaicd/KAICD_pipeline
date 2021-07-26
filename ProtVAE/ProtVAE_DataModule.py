@@ -16,16 +16,28 @@ class ProtVAE_DataModule(pl.LightningDataModule):
     ) -> ArgumentParser:
         parser = parent_parser.add_argument_group(cls.__name__)
         parser.add_argument(
-            "--train_filepath",
+            "--train_protein_filepath",
             type=str,
-            default="data/pretraining/ProteinVAE/tape_encoded/train_representation.csv",
+            default="data/pretraining/ProtVAE/tape_encoded/train_representation.csv",
             help="Path to the training data (.csv).",
         )
         parser.add_argument(
-            "--test_filepath",
+            "--test_protein_filepath",
             type=str,
-            default="data/pretraining/ProteinVAE/tape_encoded/val_representation.csv",
+            default="data/pretraining/ProtVAE/tape_encoded/val_representation.csv",
             help="Path to the testing data (.csv).",
+        )
+        parser.add_argument(
+            "--train_dataset_filepath",
+            type=str,
+            default="preprocessing/protVAE_train_dataset.pkl",
+            help="Path to the preprocessed training data (.pkl).",
+        )
+        parser.add_argument(
+            "--test_dataset_filepath",
+            type=str,
+            default="preprocessing/protVAE_test_dataset.pkl",
+            help="Path to the preprocessed testing data (.pkl).",
         )
 
         return parent_parser
@@ -33,16 +45,20 @@ class ProtVAE_DataModule(pl.LightningDataModule):
     def __init__(
         self,
         project_filepath,
-        train_filepath,
-        test_filepath,
+        train_protein_filepath,
+        test_protein_filepath,
+        train_dataset_filepath,
+        test_dataset_filepath,
         params_filepath,
         *args,
         **kwargs,
     ):
         super(ProtVAE_DataModule, self).__init__()
         self.dataset_filepath = project_filepath + "preprocessing/"
-        self.train_filepath = project_filepath + train_filepath
-        self.test_filepath = project_filepath + test_filepath
+        self.train_protein_filepath = project_filepath + train_protein_filepath
+        self.test_protein_filepath = project_filepath + test_protein_filepath
+        self.train_dataset_filepath = project_filepath + train_dataset_filepath
+        self.test_dataset_filepath = project_filepath + test_dataset_filepath
         self.params_filepath = params_filepath
         self.params = {}
 
@@ -51,16 +67,14 @@ class ProtVAE_DataModule(pl.LightningDataModule):
             self.params.update(json.load(f))
 
     def setup(self, stage: Optional[str] = None) -> None:
-        protein_filepath = [self.train_filepath, self.test_filepath]
+        protein_filepath = [self.train_protein_filepath, self.test_protein_filepath]
 
-        if osp.exists(
-            self.dataset_filepath + "protVAE_train_dataset.pkl"
-        ) and osp.exists(self.dataset_filepath + "protVAE_test_dataset.pkl"):
+        if osp.exists(self.train_dataset_filepath) and osp.exists(self.test_dataset_filepath):
             print("Preprocessing file already exists!\nLoading...")
 
-            with open(self.dataset_filepath + "protVAE_train_dataset.pkl", "rb") as f:
+            with open(self.train_dataset_filepath, "rb") as f:
                 self.train_dataset = dill.load(f)
-            with open(self.dataset_filepath + "protVAE_test_dataset.pkl", "rb") as f:
+            with open(self.test_dataset_filepath, "rb") as f:
                 self.test_dataset = dill.load(f)
             print("Done...!")
         else:
@@ -78,9 +92,9 @@ class ProtVAE_DataModule(pl.LightningDataModule):
                     self.test_dataset = dataset
 
             print("Saving...")
-            with open(self.dataset_filepath + "protVAE_train_dataset.pkl", "wb") as f:
+            with open(self.train_dataset_filepath, "wb") as f:
                 dill.dump(self.train_dataset, f)
-            with open(self.dataset_filepath + "protVAE_test_dataset.pkl", "wb") as f:
+            with open(self.test_dataset_filepath, "wb") as f:
                 dill.dump(self.test_dataset, f)
             print("Done...!")
 
