@@ -24,11 +24,7 @@ parser.add_argument(
     type=str,
     default="Toxicity/checkpoint/",
 )
-parser.add_argument(
-    "--model_name",
-    type=str,
-    default="Toxicity"
-)
+parser.add_argument("--model_name", type=str, default="Toxicity")
 parser.add_argument("--seed", type=int, default=42)
 
 # Parameter args

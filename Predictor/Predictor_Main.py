@@ -47,11 +47,7 @@ parser.add_argument(
     default="Config/Predictor.json",
     help="Path to the parameter file.",
 )
-parser.add_argument(
-    "--model_name",
-    type-str,
-    default="Predictor"
-)
+parser.add_argument("--model_name", type - str, default="Predictor")
 
 # Trainer args
 parser = pl.Trainer.add_argparse_args(parser)

@@ -38,11 +38,7 @@ parser.add_argument(
     help="ID of testing protein (LOOCV).",
     default=35,
 )
-parser.add_argument(
-    "--model_name",
-    type=str,
-    default="KAICD_RL"
-)
+parser.add_argument("--model_name", type=str, default="KAICD_RL")
 
 # Trainer args
 parser = pl.Trainer.add_argparse_args(parser)
@@ -87,7 +83,7 @@ trainer = pl.Trainer.from_argparse_args(
         project=args.project,
         name=wandb_name,
         group=wandb_group,
-        log_model=True
+        log_model=True,
     ),
     checkpoint_callback=[on_best_rl],
 )

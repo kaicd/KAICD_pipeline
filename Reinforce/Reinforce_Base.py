@@ -143,17 +143,13 @@ class Reinforce_Base(pl.LightningModule):
                 self.params[kwargs] = project_path + args
         # Restore ProtVAE model
         protein_model = ProtVAE_Module.load_from_checkpoint(
-            os.path.join(
-                project_path + protein_model_path
-            ),
+            os.path.join(project_path + protein_model_path),
             params_filepath="Config/ProtVAE.json",
         )
         self.encoder = protein_model.encoder
         # Restore ChemVAE model (only use decoder)
         chemistry_model = ChemVAE_Module.load_from_checkpoint(
-            os.path.join(
-                project_path + mol_model_path
-            ),
+            os.path.join(project_path + mol_model_path),
             project_filepath=project_path,
             params_filepath="Config/ChemVAE.json",
             smiles_language_filepath="Config/selfies_language.pkl",
@@ -166,9 +162,7 @@ class Reinforce_Base(pl.LightningModule):
         self.decoder._associate_language(decoder_smiles_language)
         # Restore affinity predictor
         self.predictor = Predictor_Module.load_from_checkpoint(
-            os.path.join(
-                project_path + affinity_model_path
-            ),
+            os.path.join(project_path + affinity_model_path),
             params_filepath="Config/Predictor.json",
         )
         # Load smiles and protein languages for predictor
@@ -190,9 +184,7 @@ class Reinforce_Base(pl.LightningModule):
             self.predictor.protein_language.padding_index,
         )
         # Load protein sequence data for protein test name
-        protein_dataset = ProteinDataset(
-            protein_data_path, test_protein_id
-        )
+        protein_dataset = ProteinDataset(protein_data_path, test_protein_id)
         self.protein_df = protein_dataset.origin_protein_df
         # Specifies the baseline model used for comparison
         self.protein_test_name = self.protein_df.iloc[test_protein_id].name

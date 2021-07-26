@@ -23,11 +23,7 @@ parser.add_argument(
     type=str,
     default="ProtVAE/checkpoint/",
 )
-parser.add_argument(
-    "--model_name",
-    type=str,
-    default="ProtVAE"
-)
+parser.add_argument("--model_name", type=str, default="ProtVAE")
 parser.add_argument("--seed", type=int, default=42)
 parser.add_argument(
     "--params_filepath",

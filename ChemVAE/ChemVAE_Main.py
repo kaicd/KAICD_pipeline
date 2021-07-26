@@ -27,15 +27,9 @@ parser.add_argument(
     default="ChemVAE/checkpoint/",
 )
 parser.add_argument(
-    "--checkpoint_filepath",
-    type=str,
-    default="ChemVAE/checkpoint/ChemVAE_5M.ckpt"
+    "--checkpoint_filepath", type=str, default="ChemVAE/checkpoint/ChemVAE_5M.ckpt"
 )
-parser.add_argument(
-    "--model_name",
-    type=str,
-    default="ChemVAE"
-)
+parser.add_argument("--model_name", type=str, default="ChemVAE")
 parser.add_argument("--seed", type=int, default=42)
 
 # Parameter args

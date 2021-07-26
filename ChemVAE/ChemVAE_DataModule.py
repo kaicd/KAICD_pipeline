@@ -74,7 +74,9 @@ class ChemVAE_DataModule(pl.LightningDataModule):
     def setup(self, stage: Optional[str] = None) -> None:
         smiles_filepath = [self.train_smiles_filepath, self.test_smiles_filepath]
 
-        if osp.exists(self.train_dataset_filepath) and osp.exists(self.test_dataset_filepath):
+        if osp.exists(self.train_dataset_filepath) and osp.exists(
+            self.test_dataset_filepath
+        ):
             print("Preprocessing file already exists!\nLoading...")
 
             with open(self.train_dataset_filepath, "rb") as f:
