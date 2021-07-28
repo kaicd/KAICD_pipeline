@@ -35,7 +35,7 @@ class Toxicity_DataModule(pl.LightningDataModule):
         parser.add_argument(
             "--smiles_language_filepath",
             type=str,
-            default="data/pretraining/language_models/smiles_language_tox21.pkl",
+            default="Config/Toxicity_smiles_language.pkl",
             help="Path to a pickle object a SMILES language object",
         )
 
@@ -49,7 +49,6 @@ class Toxicity_DataModule(pl.LightningDataModule):
         smi_filepath,
         smiles_language_filepath,
         params_filepath,
-        device,
         *args,
         **kwargs,
     ):
@@ -57,11 +56,10 @@ class Toxicity_DataModule(pl.LightningDataModule):
         self.train_score_filepath = project_filepath + train_score_filepath
         self.test_score_filepath = project_filepath + test_score_filepath
         self.smi_filepath = project_filepath + smi_filepath
-        self.smiles_language_filepath = project_filepath + smiles_language_filepath
+        self.smiles_language_filepath = smiles_language_filepath
         self.smiles_language = SMILESLanguage.load(self.smiles_language_filepath)
         self.params_filepath = params_filepath
         self.params = {}
-        self.device = device
 
         # Process parameter file
         with open(self.params_filepath) as f:
@@ -92,7 +90,7 @@ class Toxicity_DataModule(pl.LightningDataModule):
                 remove_chirality=self.params.get("remove_chirality", False),
                 selfies=self.params.get("selfies", False),
                 sanitize=sanitize[i],
-                device=self.device,
+                device=th.device("cpu"),
                 backend="eager",
             )
             dataset = AnnotatedDataset(

@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 from Utility.hyperparams import ACTIVATION_FN_FACTORY
 
+
 class DenseEncoder(nn.Module):
     """
     This meta encoder defines loading, saving and related operations which
@@ -32,15 +33,14 @@ class DenseEncoder(nn.Module):
         """
         super(DenseEncoder, self).__init__()
 
-        self.input_size = params['input_size']
-        self.hidden_sizes = params['hidden_sizes_encoder']
-        self.latent_size = params['latent_size']
-        self.activation_fn = ACTIVATION_FN_FACTORY[
-            params.get('activation_fn', 'relu')]
+        self.input_size = params["input_size"]
+        self.hidden_sizes = params["hidden_sizes_encoder"]
+        self.latent_size = params["latent_size"]
+        self.activation_fn = ACTIVATION_FN_FACTORY[params.get("activation_fn", "relu")]
         self.dropout = (
-            [params.get('dropout', 0.0)] * len(self.hidden_sizes)
-            if isinstance(params.get('dropout', 0.0), float) else
-            params.get('dropout', 0.0)
+            [params.get("dropout", 0.0)] * len(self.hidden_sizes)
+            if isinstance(params.get("dropout", 0.0), float)
+            else params.get("dropout", 0.0)
         )
         self._assertion_tests()
 
@@ -49,7 +49,7 @@ class DenseEncoder(nn.Module):
         ops = []
         for index in range(1, len(num_units)):
             ops.append(nn.Linear(num_units[index - 1], num_units[index]))
-            if params.get('batch_norm', True):
+            if params.get("batch_norm", True):
                 ops.append(nn.BatchNorm1d(num_units[index]))
             ops.append(self.activation_fn)
             if self.dropout[index - 1] > 0.0:
@@ -57,12 +57,8 @@ class DenseEncoder(nn.Module):
 
         self.encoding = nn.Sequential(*ops)
 
-        self.encoding_to_mu = nn.Linear(
-            self.hidden_sizes[-1], self.latent_size
-        )
-        self.encoding_to_logvar = nn.Linear(
-            self.hidden_sizes[-1], self.latent_size
-        )
+        self.encoding_to_mu = nn.Linear(self.hidden_sizes[-1], self.latent_size)
+        self.encoding_to_logvar = nn.Linear(self.hidden_sizes[-1], self.latent_size)
 
     def forward(self, data):
         """Projects an input into the latent space.
@@ -77,10 +73,7 @@ class DenseEncoder(nn.Module):
                 `[batch_size, self.latent_size]`.
         """
         projection = self.encoding(data)
-        return (
-            self.encoding_to_mu(projection),
-            self.encoding_to_logvar(projection)
-        )
+        return (self.encoding_to_mu(projection), self.encoding_to_logvar(projection))
 
     def _assertion_tests(self):
         """Checks size issues.
@@ -89,10 +82,12 @@ class DenseEncoder(nn.Module):
         assert self.hidden_sizes == sorted(
             self.hidden_sizes, reverse=True
         ), "Hidden sizes not monotonic."
-        assert self.latent_size < self.hidden_sizes[
-            -1], "Latent size not smaller than last hidden size."
-        assert self.input_size >= self.hidden_sizes[
-            0], "No compression in first hidden layer."
+        assert (
+            self.latent_size < self.hidden_sizes[-1]
+        ), "Latent size not smaller than last hidden size."
+        assert (
+            self.input_size >= self.hidden_sizes[0]
+        ), "No compression in first hidden layer."
         assert len(self.dropout) == len(
             self.hidden_sizes
         ), "Dropout lengths does not match hidden sizes."

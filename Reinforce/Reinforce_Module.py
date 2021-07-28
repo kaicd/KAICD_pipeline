@@ -119,15 +119,20 @@ class Reinforce_Module(Reinforce_Base):
             self.gen_mols_esol.append(self.esol(s))
             self.gen_mols_sas.append(self.sas(s))
         # Log efficacy and non toxicity ratio
-        save_path = "/raid/PaccMann_sarscov2/binding_images/" + self.protein_test_name
-        if not os.path.isdir(save_path):
-            os.mkdir(save_path)
+        img_save_path = os.path.join(
+            self.result_filepath,
+            self.model_name,
+            "binding_images",
+            self.protein_test_name,
+        )
+        if not os.path.isdir(img_save_path):
+            os.mkdir(img_save_path)
         plot_and_compare_proteins(
             self.unbiased_preds,
             preds,
             self.protein_test_name,
             self.current_epoch,
-            "/raid/PaccMann_sarscov2",
+            img_save_path,
             "train",
             self.batch_size,
         )
@@ -144,10 +149,7 @@ class Reinforce_Module(Reinforce_Base):
                         Image(
                             pilimg.open(
                                 os.path.join(
-                                    "/raid",
-                                    "PaccMann_sarscov2",
-                                    "binding_images",
-                                    self.protein_test_name,
+                                    img_save_path,
                                     f"train_{self.protein_test_name}_epoch_{self.current_epoch}_eff_{biased_ratio}.png",
                                 )
                             )
@@ -156,7 +158,7 @@ class Reinforce_Module(Reinforce_Base):
                 }
             )
             self.best_biased_ratio = biased_ratio
-        # Log top 4 generate molecule
+        # Log top 4 generated molecule images
         idx = np.argsort(self.low_toxic_useful_preds)[::-1]
         lead = []
         captions = []
@@ -167,7 +169,6 @@ class Reinforce_Module(Reinforce_Base):
                 captions.append(str(self.low_toxic_useful_preds[i]))
                 if len(lead) == 4:
                     break
-
         if len(lead) > 0:
             self.logger.experiment.log(
                 {
@@ -176,8 +177,10 @@ class Reinforce_Module(Reinforce_Base):
                     ]
                 }
             )
-
-    def on_train_end(self):
+        # Log generated molecules information
+        df_save_path = os.path.join(self.result_filepath, self.model_name, "results")
+        if not os.path.isdir(df_save_path):
+            os.mkdir(df_save_path)
         df = pd.DataFrame(
             {
                 "protein": self.gen_prot,
@@ -192,7 +195,8 @@ class Reinforce_Module(Reinforce_Base):
         )
         df.to_csv(
             os.path.join(
-                "/raid", "PaccMann_sarscov2", "results", self.protein_test_name + "_generated.csv"
+                df_save_path,
+                self.protein_test_name + "_generated.csv",
             )
         )
         self.logger.experiment.log({"Generate Molecules": [Table(dataframe=df)]})

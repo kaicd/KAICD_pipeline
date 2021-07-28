@@ -1,7 +1,7 @@
 model_name: "ChemVAE_5M"
 project_filepath: "/raid/KAICD_sarscov2/"
 save_filepath: "ChemVAE/checkpoint/"
-smiles_language_filepath: "Config/selfies_language.pkl"
+smiles_language_filepath: "Config/ChemVAE_selfies_language.pkl"
 params_filepath: "Config/ChemVAE.json"
 train_smiles_filepath: "data/pretraining/ChemVAE/train_final_seed.smi"
 test_smiles_filepath: "data/pretraining/ChemVAE/test_final_seed.smi"

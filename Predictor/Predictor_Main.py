@@ -1,18 +1,15 @@
-import json
 import argparse
 
 import pytorch_lightning as pl
 from pytorch_lightning import loggers
 from pytorch_lightning.callbacks import ModelCheckpoint
-from pytoda.proteins.protein_language import ProteinLanguage
-from pytoda.smiles.smiles_language import SMILESLanguage
 
-from Predictor_Module import Predictor_Module
-from Predictor_DataModule import Predictor_DataModule
+from PredictorDS_Module import PredictorDS_Module
+from PredictorBA_Module import PredictorBA_Module
+from PredictorDS_DataModule import PredictorDS_DataModule
+from PredictorBA_DataModule import PredictorBA_DataModule
 
 parser = argparse.ArgumentParser()
-
-# Project args
 parser.add_argument("--entity", type=str, default="kaicd")
 parser.add_argument("--project", type=str, default="KAICD_sarscov2")
 parser.add_argument(
@@ -27,86 +24,56 @@ parser.add_argument(
     default="Predictor/checkpoint/",
 )
 parser.add_argument("--seed", type=int, default=42)
-
-# Parameter args
-parser.add_argument(
-    "--smiles_language_filepath",
-    type=str,
-    default="data/pretraining/language_models/smiles_language_chembl_gdsc_ccle_tox21_zinc_organdb_bindingdb.pkl",
-    help="Path to a pickle of a SMILES language object.",
-)
-parser.add_argument(
-    "--protein_language_filepath",
-    type=str,
-    default="data/pretraining/language_models/protein_language_bindingdb.pkl",
-    help="Path to a pickle of a Protein language object.",
-)
 parser.add_argument(
     "--params_filepath",
     type=str,
-    default="Config/Predictor.json",
+    default="Config/PredictorBA.json",
     help="Path to the parameter file.",
 )
-parser.add_argument(
-    "--model_name",
-    type-str,
-    default="Predictor"
-)
+parser.add_argument("--model_name", type=str, default="Predictor")
 
 # Trainer args
 parser = pl.Trainer.add_argparse_args(parser)
 parser.set_defaults(gpus=1, accelerator="ddp", max_epochs=200)
+args, _ = parser.parse_known_args()
+
+# Model selection
+if "BA" in args.params_filepath:
+    Module = PredictorBA_Module
+    DataModule = PredictorBA_DataModule
+    monitor = ["loss", "roc_auc", "avg_precision_score"]
+    mode = ["min", "max", "max"]
+elif "DS" in args.params_filepath:
+    Module = PredictorDS_Module
+    DataModule = PredictorDS_DataModule
+    monitor = ["loss", "pearson", "rmse"]
+    mode = ["min", "max", "min"]
+else:
+    raise ValueError(
+        "The params_filepath must include DS(meaning Drug Sensitivity) or BA(meaning Binding Affinity)"
+    )
 
 # Dataset args
-parser = Predictor_DataModule.add_argparse_args(parser)
-args, _ = parser.parse_known_args()
+parser = DataModule.add_argparse_args(parser)
 pl.seed_everything(args.seed)
-
-# Parameter update
-params = {}
-with open(args.params_filepath) as f:
-    params.update(json.load(f))
-smiles_language = SMILESLanguage.load(
-    args.project_filepath + args.smiles_language_filepath
-)
-protein_language = ProteinLanguage.load(
-    args.project_filepath + args.protein_language_filepath
-)
-params.update(
-    {
-        "smiles_vocabulary_size": smiles_language.number_of_tokens,
-        "protein_vocabulary_size": protein_language.number_of_tokens,
-    }
-)
-with open(args.params_filepath, "w") as f:
-    json.dump(params, f)
+args, _ = parser.parse_known_args()
 
 # Define dataset and model
-net = Predictor_Module(**vars(args))
-data = Predictor_DataModule(device=net.device, **vars(args))
+net = Module(**vars(args))
+data = DataModule(**vars(args))
 
 # Define pytorch-lightning Trainer multiple callbacks
-on_best_loss = ModelCheckpoint(
-    dirpath=args.project_filepath + args.save_filepath,
-    filename=args.model_name + "_best_loss",
-    monitor="val_loss",
-    save_top_k=1,
-    mode="min",
-)
-on_best_roc_auc = ModelCheckpoint(
-    dirpath=args.project_filepath + args.save_filepath,
-    filename=args.model_name + "_best_roc_auc",
-    monitor="val_roc_auc",
-    save_top_k=1,
-    mode="max",
-)
-on_best_avg_precision_score = ModelCheckpoint(
-    dirpath=args.project_filepath + args.save_filepath,
-    filename=args.model_name + "_best_avg_prec",
-    monitor="val_avg_precision_score",
-    save_top_k=1,
-    mode="max",
-)
+callbacks = []
+for i, j in zip(monitor, mode):
+    callbacks.append(
+        ModelCheckpoint(
+            dirpath=args.project_filepath + args.save_filepath,
+            filename=args.model_name + "_best_" + i,
+            monitor="val_" + i,
+            save_top_k=1,
+            mode=j,
+        )
+    )
 
 # Define pytorch-lightning Trainer
 trainer = pl.Trainer.from_argparse_args(
@@ -117,7 +84,7 @@ trainer = pl.Trainer.from_argparse_args(
         name=args.model_name,
         log_model=True,
     ),
-    callbacks=[on_best_loss, on_best_roc_auc, on_best_avg_precision_score],
+    callbacks=callbacks,
 )
 
 if args.auto_lr_find or args.auto_scale_batch_size:
