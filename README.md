@@ -6,11 +6,11 @@ From now on, we will assume that they are stored in the root of the repository i
 ```console
 data
 ├── pretraining
-│   ├── ProteinVAE
-│   ├── SELFIESVAE
-│   ├── affinity_predictor
-│   ├── language_models
-│   └── toxicity_predictor
+│   ├── ChemVAE
+│   ├── ProtVAE
+│   ├── Predictor
+│   ├── Toxicity
+│   └── language_models
 └── training
 ```
 This is around **6GB** of data, required for pretaining multiple models.
@@ -24,32 +24,7 @@ or
 or
 (paccmann_sarscov2) $ PYTHONPATH='./' python Main.py --model ProtVAE
 or
-(paccmann_sarscov2) $ PYTHONPATH='./' python Main.py --model Predictor
-or
+(paccmann_sarscov2) $ PYTHONPATH='./' python Main.py --model Predictor --mode BA(or DS)
+or 
 (paccmann_sarscov2) $ PYTHONPATH='./' python Main.py --model Toxicity
-```
-
-### reinforce generator(Pytorch-Lightning)
-```console
-(paccmann_sarscov2) $ PYTHONPATH='./' python ./Reinforce/Reinforce_Main.py
-```
-
-### selfies VAE(Pytorch-Lightning)
-```console
-(paccmann_sarscov2) $ PYTHONPATH='./' python ./ChemVAE/ChemVAE_Main.py
-```
-
-### protein VAE(Pytorch-Lightning)
-```console
-(paccmann_sarscov2) $ PYTHONPATH='./' python ./ProtVAE/ProtVAE_Main.py
-```
-
-### affinity predictor(Pytorch-Lightning)
-```console
-(paccmann_sarscov2) $ PYTHONPATH='./' python ./Predictor/Predictor_Main.py
-```
-
-### toxicity predictor(Pytorch-Lightning)
-```console
-(paccmann_sarscov2) $ PYTHONPATH='./' python ./Toxicity/Toxicity_Main.py
 ```
