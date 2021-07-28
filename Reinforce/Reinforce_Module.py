@@ -33,7 +33,7 @@ class Reinforce_Module(Reinforce_Base):
             self.gen_mols_scscore,
             self.gen_mols_esol,
             self.gen_mols_sas,
-            self.gen_mols_lipinski,
+            self.gen_mols_epoch,
         ) = ([], [], [], [], [])
 
     """
@@ -66,6 +66,17 @@ class Reinforce_Module(Reinforce_Base):
         return padded_nums, hidden, stack, rewards
 
     def on_train_start(self):
+        # Generate directory
+        training_result_path = os.path.join(self.result_filepath, self.model_name)
+        if not os.path.isdir(training_result_path):
+            os.mkdir(training_result_path)
+        img_save_path = os.path.join(training_result_path, "binding_images")
+        if not os.path.isdir(img_save_path):
+            os.mkdir(img_save_path)
+        df_save_path = os.path.join(training_result_path, "results")
+        if not os.path.isdir(df_save_path):
+            os.mkdir(df_save_path)
+        # Update parameters
         self.update_params(self.params)
 
     def training_step(self, batch, *args, **kwargs):
@@ -100,9 +111,7 @@ class Reinforce_Module(Reinforce_Base):
         )
         preds = preds.detach().cpu().numpy()
         # Filtering (affinity > 0.5, tox == 1.0)
-        useful_smiles = [s for i, s in enumerate(smiles) if preds[i] > 0.5]
-        useful_preds = preds[preds > 0.5]
-        for p, s in zip(useful_preds, useful_smiles):
+        for p, s in zip(preds, smiles):
             # Save effective molecules
             self.gen_mols.append(s)
             self.gen_prot.append(self.protein_test_name)
@@ -110,7 +119,7 @@ class Reinforce_Module(Reinforce_Base):
             # Save toxicity of effective molecules
             tox = self.tox21(s)
             self.toxes.append(tox)
-            if tox > 0.5:
+            if p > 0.5 and tox > 0.5:
                 self.low_toxic_useful_smiles.append(s)
                 self.low_toxic_useful_preds.append(p)
             # Save property of effective molecules
@@ -118,6 +127,7 @@ class Reinforce_Module(Reinforce_Base):
             self.gen_mols_scscore.append(self.scscore(s))
             self.gen_mols_esol.append(self.esol(s))
             self.gen_mols_sas.append(self.sas(s))
+            self.gen_mols_epoch.append(self.current_epoch)
         # Log efficacy and non toxicity ratio
         img_save_path = os.path.join(
             self.result_filepath,
@@ -159,12 +169,12 @@ class Reinforce_Module(Reinforce_Base):
             )
             self.best_biased_ratio = biased_ratio
         # Log top 4 generated molecule images
-        idx = np.argsort(self.low_toxic_useful_preds)[::-1]
+        idx = np.argsort([len(i) for i in self.low_toxic_useful_smiles])[::-1]
         lead = []
         captions = []
         for i in idx:
             mol = Chem.MolFromSmiles(self.low_toxic_useful_smiles[i])
-            if mol and len(self.low_toxic_useful_smiles[i]) >= 20:
+            if mol:
                 lead.append(mol)
                 captions.append(str(self.low_toxic_useful_preds[i]))
                 if len(lead) == 4:
@@ -177,10 +187,7 @@ class Reinforce_Module(Reinforce_Base):
                     ]
                 }
             )
-        # Log generated molecules information
         df_save_path = os.path.join(self.result_filepath, self.model_name, "results")
-        if not os.path.isdir(df_save_path):
-            os.mkdir(df_save_path)
         df = pd.DataFrame(
             {
                 "protein": self.gen_prot,
@@ -191,6 +198,7 @@ class Reinforce_Module(Reinforce_Base):
                 "SCScore": self.gen_mols_scscore,
                 "ESOL": self.gen_mols_esol,
                 "SAS": self.gen_mols_sas,
+                "epoch": self.gen_mols_epoch,
             }
         )
         df.to_csv(

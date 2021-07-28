@@ -18,3 +18,4 @@ organdb_path:
 site:
 clintox_path:
 sider_path:
+result_filepath: "/raid/KAICD_sarscov2"

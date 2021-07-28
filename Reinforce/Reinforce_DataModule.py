@@ -7,9 +7,9 @@ from Utility.utils import ProteinDataset
 
 
 class Reinforce_DataModule(pl.LightningDataModule):
-    def __init__(self, protein_data_path, test_protein_id, **kwargs):
+    def __init__(self, project_path, protein_data_path, test_protein_id, **kwargs):
         super(Reinforce_DataModule, self).__init__()
-        self.protein_data_path = protein_data_path
+        self.protein_data_path = project_path + protein_data_path
         self.test_protein_id = test_protein_id
 
     def setup(self, stage: Optional[str] = None) -> None:

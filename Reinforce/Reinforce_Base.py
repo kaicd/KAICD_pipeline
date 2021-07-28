@@ -45,19 +45,19 @@ class Reinforce_Base(pl.LightningModule):
             "--chem_model_path",
             type=str,
             help="Path to chemistry model",
-            default="ChemVAE/checkpoint/",
+            default="ChemVAE/checkpoint/ChemVAE_5M_antiviral_2.ckpt",
         )
         parser.add_argument(
             "--prot_model_path",
             type=str,
             help="Path to protein model",
-            default="ProtVAE/checkpoint/",
+            default="ProtVAE/checkpoint/ProtVAE.ckpt",
         )
         parser.add_argument(
             "--pred_model_path",
             type=str,
             help="Path to pretrained affinity model",
-            default="Predictor/checkpoint/",
+            default="Predictor/checkpoint/Predictor.ckpt",
         )
         parser.add_argument(
             "--params_path",
@@ -81,7 +81,7 @@ class Reinforce_Base(pl.LightningModule):
             "--pred_model_params_path",
             type=str,
             help="Prediction model params json file directory",
-            default="Config/ProdictorBA.json",
+            default="Config/PredictorBA.json",
         )
         parser.add_argument(
             "--chem_smiles_language_path",
@@ -111,6 +111,7 @@ class Reinforce_Base(pl.LightningModule):
             "--tox21_path",
             type=str,
             help="Optional path to Tox21 model.",
+            default="Toxicity/checkpoint/Toxicity.ckpt"
         )
         parser.add_argument(
             "--organdb_path",
@@ -133,7 +134,9 @@ class Reinforce_Base(pl.LightningModule):
             help="Optional path to SIDER model.",
         )
         parser.add_argument(
-            "--result_filepath", type=str, default="/raid/KAICD_sarscov2"
+            "--result_filepath",
+            type=str,
+            default="/raid/KAICD_sarscov2"
         )
 
         return parent_parser
@@ -189,7 +192,7 @@ class Reinforce_Base(pl.LightningModule):
         for (args, kwargs) in optional_rewards:
             if args:
                 # json still has presedence
-                self.params[kwargs] = project_path + args
+                self.params[kwargs] = args
         # Restore ProtVAE model
         protein_model = ProtVAE_Module.load_from_checkpoint(
             prot_model_path,
@@ -299,7 +302,6 @@ class Reinforce_Base(pl.LightningModule):
         self.tox21_weight = params.get("tox21_weight", 0.5)
         if self.tox21_weight > 0.0:
             self.tox21 = Tox21(
-                project_path=self.project_path,
                 params_path="Config/Toxicity.json",
                 model_path=params.get("tox21_path", ""),
                 device=self.device,
@@ -599,6 +601,8 @@ class Reinforce_Base(pl.LightningModule):
         valid_smiles, valid_nums, _ = self.get_smiles_from_latent(
             latent_z, remove_invalid=remove_invalid
         )
+        # Deduplication
+        valid_smiles = list(set(valid_smiles))
         smiles_t = self.smiles_to_numerical(valid_smiles, target="predictor")
         # Evaluate drugs
         pred, pred_dict = self.predictor(

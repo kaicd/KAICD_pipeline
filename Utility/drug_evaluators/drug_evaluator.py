@@ -31,7 +31,7 @@ class DrugEvaluator:
 
         raise NotImplementedError
 
-    def load_mca(self, project_path: str, params_path: str, model_path: str):
+    def load_mca(self, params_path: str, model_path: str):
         """
         Restores pretrained MCA
 
@@ -42,12 +42,12 @@ class DrugEvaluator:
             params = json.load(f)
         # Set up language and transforms
         self.smiles_language = SMILESLanguage.load(
-            os.path.join(project_path, "Config", "PredictorBA_smiles_language.pkl")
+            os.path.join("Config", "PredictorBA_smiles_language.pkl")
         )
         self.transforms = self.compose_smiles_transforms(params)
         # Initialize and restore model weights
         self.model = Toxicity_Module.load_from_checkpoint(
-            os.path.join(project_path, model_path), params_filepath=params_path
+            model_path, params_filepath=params_path
         )
         self.model.eval()
 
