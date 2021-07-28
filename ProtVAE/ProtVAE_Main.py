@@ -46,27 +46,18 @@ net = ProtVAE_Module(**vars(args))
 data = ProtVAE_DataModule(**vars(args))
 
 # Define pytorch-lightning Trainer multiple callbacks
-on_best_loss = ModelCheckpoint(
-    dirpath=args.project_filepath + args.save_filepath,
-    filename=args.model_name + "_best_loss",
-    monitor="val_loss",
-    save_top_k=1,
-    mode="min",
-)
-on_best_rec = ModelCheckpoint(
-    dirpath=args.project_filepath + args.save_filepath,
-    filename=args.model_name + "_best_rec",
-    monitor="val_rec",
-    save_top_k=1,
-    mode="min",
-)
-on_best_kld = ModelCheckpoint(
-    dirpath=args.project_filepath + args.save_filepath,
-    filename=args.model_name + "_best_kld",
-    monitor="val_kld",
-    save_top_k=1,
-    mode="min",
-)
+monitor = ["loss", "rec", "kld"]
+callbacks = []
+for i in monitor:
+    callbacks.append(
+        ModelCheckpoint(
+            dirpath=args.project_filepath + args.save_filepath,
+            filename=args.model_name + "_best_" + i,
+            monitor="val_" + i,
+            save_top_k=1,
+            mode="min",
+        )
+    )
 
 # Define pytorch-lightning Trainer
 trainer = pl.Trainer.from_argparse_args(
@@ -74,7 +65,7 @@ trainer = pl.Trainer.from_argparse_args(
     logger=loggers.WandbLogger(
         entity=args.entity, project=args.project, name=args.model_name, log_model=True
     ),
-    callbacks=[on_best_loss, on_best_rec, on_best_kld],
+    callbacks=callbacks,
 )
 
 if args.auto_lr_find or args.auto_scale_batch_size:

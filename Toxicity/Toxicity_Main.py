@@ -61,30 +61,22 @@ if params.get("embedding", "learned") == "pretrained":
 
 # Define dataset and model
 net = Toxicity_Module(**vars(args))
-data = Toxicity_DataModule(device=net.device, **vars(args))
+data = Toxicity_DataModule(**vars(args))
 
 # Define pytorch-lightning Trainer multiple callbacks
-on_best_loss = ModelCheckpoint(
-    dirpath=args.project_filepath + args.save_filepath,
-    filename=args.model_name + "_best_loss",
-    monitor="val_loss",
-    save_top_k=1,
-    mode="min",
-)
-on_best_roc_auc = ModelCheckpoint(
-    dirpath=args.project_filepath + args.save_filepath,
-    filename=args.model_name + "_best_roc_auc",
-    monitor="val_roc_auc",
-    save_top_k=1,
-    mode="max",
-)
-on_best_avg_precision_score = ModelCheckpoint(
-    dirpath=args.project_filepath + args.save_filepath,
-    filename=args.model_name + "_best_avg_prec",
-    monitor="val_avg_precision_score",
-    save_top_k=1,
-    mode="max",
-)
+monitor = ["loss", "roc_auc", "avg_precision_score"]
+mode = ["min", "max", "max"]
+callbacks = []
+for i, j in zip(monitor, mode):
+    callbacks.append(
+        ModelCheckpoint(
+            dirpath=args.project_filepath + args.save_filepath,
+            filename=args.model_name + "_best_" + i,
+            monitor="val_" + i,
+            save_top_k=1,
+            mode=j,
+        )
+    )
 
 # Define pytorch-lightning Trainer
 trainer = pl.Trainer.from_argparse_args(
@@ -92,7 +84,7 @@ trainer = pl.Trainer.from_argparse_args(
     logger=loggers.WandbLogger(
         entity=args.entity, project=args.project, name=args.model_name, log_model=True
     ),
-    callbacks=[on_best_loss, on_best_roc_auc, on_best_avg_precision_score],
+    callbacks=callbacks,
 )
 
 if args.auto_lr_find or args.auto_scale_batch_size:

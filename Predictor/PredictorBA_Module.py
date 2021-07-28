@@ -9,7 +9,6 @@ import pytorch_lightning as pl
 from sklearn.metrics import (
     auc,
     average_precision_score,
-    precision_recall_curve,
     roc_curve,
 )
 
@@ -29,7 +28,7 @@ from Utility.layers import (
 )
 
 
-class Predictor_Module(pl.LightningModule):
+class PredictorBA_Module(pl.LightningModule):
     """Bimodal Multiscale Convolutional Attentive Encoder.
 
     This is based on the MCA model as presented in the publication in
@@ -42,58 +41,7 @@ class Predictor_Module(pl.LightningModule):
         params_filepath,
         **kwargs,
     ):
-        """Constructor.
-
-        Args:
-            params (dict): A dictionary containing the parameter to built the
-                dense encoder.
-                TODO params should become actual arguments (use **params).
-
-        Required items in params:
-            smiles_padding_length (int): dimension of tokens' embedding.
-            smiles_vocabulary_size (int): size of the tokens vocabulary.
-            protein_padding_length (int): dimension of tokens' embedding.
-            protein_vocabulary_size (int): size of the tokens vocabulary.
-        Optional items in params:
-            activation_fn (string): Activation function used in all ayers for
-                specification in ACTIVATION_FN_FACTORY. Defaults to 'relu'.
-            batch_norm (bool): Whether batch normalization is applied. Defaults
-                to True.
-            dropout (float): Dropout probability in all except context
-                attention layer. Defaults to 0.5.
-            smiles_embedding_size (int): Embedding dimensionality, default: 32
-            protein_embedding_size (int): Embedding dimensionality, default: 8
-            smiles_filters (list[int]): Numbers of filters to learn per
-                convolutional layer. Defaults to [32, 32, 32].
-            protein_filters (list[int]): Numbers of filters to learn per
-                convolutional layer. Defaults to [32, 32, 32].
-            smiles_kernel_sizes (list[list[int]]): Sizes of kernels per
-                convolutional layer. Defaults to  [
-                    [3, params['smiles_embedding_size']],
-                    [5, params['smiles_embedding_size']],
-                    [11, params['smiles_embedding_size']]
-                ]
-            protein_kernel_sizes (list[list[int]]): Sizes of kernels per
-                convolutional layer. Defaults to  [
-                    [3, params['protein_embedding_size']],
-                    [11, params['protein_embedding_size']],
-                    [25, params['protein_embedding_size']]
-                ]
-                NOTE: The kernel sizes should match the dimensionality of the
-                smiles_embedding_size, so if the latter is 8, the images are
-                t x 8, then treat the 8 embedding dimensions like channels
-                in an RGB image.
-            smiles_attention_size (int): size of the attentive layer for the
-                smiles sequence. Defaults to 16.
-            protein_attention_size (int): size of the attentive layer for the
-                protein sequence. Defaults to 16.
-            dense_hidden_sizes (list[int]): Sizes of the hidden dense layers.
-                Defaults to [20].
-            final_activation: (bool): Whether a (sigmoid) activation function
-                is used in the final layer. Defaults to False.
-        """
-
-        super(Predictor_Module, self).__init__()
+        super(PredictorBA_Module, self).__init__()
         # Model Parameter
         params = {}
         with open(params_filepath) as f:
@@ -105,14 +53,10 @@ class Predictor_Module(pl.LightningModule):
         self.smiles_padding_length = params["smiles_padding_length"]
         self.protein_padding_length = params["protein_padding_length"]
 
-        self.loss_fn = LOSS_FN_FACTORY[
-            params.get("loss_fn", "binary_cross_entropy")
-        ]  # yapf: disable
+        self.loss_fn = LOSS_FN_FACTORY[params.get("loss_fn", "binary_cross_entropy")]
         self.opt_fn = OPTIMIZER_FACTORY[params.get("optimizer", "Adam")]
         # Hyperparameter
-        self.act_fn = ACTIVATION_FN_FACTORY[
-            params.get("activation_fn", "relu")
-        ]  # yapf: disable
+        self.act_fn = ACTIVATION_FN_FACTORY[params.get("activation_fn", "relu")]
         self.dropout = params.get("dropout", 0.5)
         self.use_batch_norm = params.get("batch_norm", True)
         self.smiles_embedding_size = params.get("smiles_embedding_size", 32)

@@ -5,13 +5,15 @@ import argparse
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--model", type=str, default="Reinforce")
+parser.add_argument("--mode", type=str, default="")
 args, _ = parser.parse_known_args()
 model = args.model
+mode = args.mode if args.model == "Predictor" else ""
 
 # Load yaml file (configuration file)
 with open("Config/Main.yaml") as f:
     main_cfg = yaml.load(f, Loader=yaml.FullLoader)
-with open("Config/" + model + ".yaml") as f:
+with open("Config/" + model + mode + ".yaml") as f:
     model_cfg = yaml.load(f, Loader=yaml.FullLoader)
 
 # Call the main file

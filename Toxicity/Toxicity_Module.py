@@ -43,52 +43,6 @@ class Toxicity_Module(pl.LightningModule):
         params_filepath,
         **kwargs,
     ):
-        """Constructor.
-        Args:
-            params (dict): A dictionary containing the parameter to built the
-                dense encoder.
-        Items in params:
-            smiles_embedding_size (int): dimension of tokens' embedding.
-            smiles_vocabulary_size (int): size of the tokens vocabulary.
-            activation_fn (string, optional): Activation function used in all
-                layers for specification in ACTIVATION_FN_FACTORY.
-                Defaults to 'relu'.
-            batch_norm (bool, optional): Whether batch normalization is
-                applied. Defaults to True.
-            dropout (float, optional): Dropout probability in all
-                except parametric layer. Defaults to 0.5.
-            filters (list[int], optional): Numbers of filters to learn per
-                convolutional layer. Defaults to [64, 64, 64].
-            kernel_sizes (list[list[int]], optional): Sizes of kernels per
-                convolutional layer. Defaults to  [
-                    [3, params['smiles_embedding_size']],
-                    [5, params['smiles_embedding_size']],
-                    [11, params['smiles_embedding_size']]
-                ]
-                NOTE: The kernel sizes should match the dimensionality of the
-                smiles_embedding_size, so if the latter is 8, the images are
-                t x 8, then treat the 8 embedding dimensions like channels
-                in an RGB image.
-            multiheads (list[int], optional): Amount of attentive multiheads
-                per SMILES embedding. Should have len(filters)+1.
-                Defaults to [4, 4, 4, 4].
-            stacked_dense_hidden_sizes (list[int], optional): Sizes of the
-                hidden dense layers. Defaults to [1024, 512].
-            smiles_attention_size (int, optional): size of the attentive layer
-                for the smiles sequence. Defaults to 64.
-        Example params:
-        ```
-        {
-            "smiles_attention_size": 8,
-            "smiles_vocabulary_size": 28,
-            "smiles_embedding_size": 8,
-            "filters": [128, 128],
-            "kernel_sizes": [[3, 8], [5, 8]],
-            "multiheads":[4, 4, 4]
-            "stacked_dense_hidden_sizes": [1024, 512]
-        }
-        ```
-        """
         super(Toxicity_Module, self).__init__()
         self.params_filepath = params_filepath
 

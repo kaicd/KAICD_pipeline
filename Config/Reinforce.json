@@ -11,8 +11,7 @@
   "steps": 40,
   "batch_size": 128,
   "eval_batch_size": 256,
-  "affinity_weight": 0.7,
-  "tox21_weight": 0.3,
-  "ring_weight": 0.5,
-  "qed_weight": 0.5
+  "affinity_weight": 1.0,
+  "tox21_weight": 0.5,
+  "ring_weight": 0.5
 }

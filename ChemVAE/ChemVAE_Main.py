@@ -36,7 +36,7 @@ parser.add_argument("--seed", type=int, default=42)
 parser.add_argument(
     "--smiles_language_filepath",
     type=str,
-    default="Config/selfies_language.pkl",
+    default="Config/ChemVAE_selfies_language.pkl",
     help="Path to a pickle of a SMILES language object.",
 )
 parser.add_argument(
@@ -88,20 +88,18 @@ if not ckpt == "":
     net = ChemVAE_Module.load_from_checkpoint(ckpt, **vars(args))
 
 # Define pytorch-lightning Trainer multiple callbacks
-on_best_loss = ModelCheckpoint(
-    dirpath=args.project_filepath + args.save_filepath,
-    filename=args.model_name + "_best_loss",
-    monitor="val_loss",
-    save_top_k=1,
-    mode="min",
-)
-on_best_kl_div = ModelCheckpoint(
-    dirpath=args.project_filepath + args.save_filepath,
-    filename=args.model_name + "_best_kl_div",
-    monitor="val_kl_div",
-    save_top_k=1,
-    mode="min",
-)
+monitor = ["loss", "kl_div"]
+callbacks = []
+for i in monitor:
+    callbacks.append(
+        ModelCheckpoint(
+            dirpath=args.project_filepath + args.save_filepath,
+            filename=args.model_name + "_best_" + i,
+            monitor="val_" + i,
+            save_top_k=1,
+            mode="min",
+        )
+    )
 
 # Define pytorch-lightning Trainer
 trainer = pl.Trainer.from_argparse_args(
@@ -110,7 +108,7 @@ trainer = pl.Trainer.from_argparse_args(
     logger=loggers.WandbLogger(
         entity=args.entity, project=args.project, name=args.model_name, log_model=True
     ),
-    callbacks=[on_best_loss, on_best_kl_div],
+    callbacks=callbacks,
 )
 
 if args.auto_lr_find or args.auto_scale_batch_size:

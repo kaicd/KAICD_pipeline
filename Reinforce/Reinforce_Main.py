@@ -19,13 +19,13 @@ parser.add_argument(
     "--project_path",
     type=str,
     help="Path to KAICD_sarscov2 project",
-    default="./",
+    default="/raid/KAICD_sarscov2/",
 )
 parser.add_argument(
     "--protein_data_path",
     type=str,
     help="Path to protein data for conditioning",
-    default="/raid/KAICD_sarscov2/data/training/merged_sequence_encoding/uniprot_covid-19.csv",
+    default="data/training/merged_sequence_encoding/uniprot_covid-19.csv",
 )
 parser.add_argument(
     "--save_filepath",

@@ -10,7 +10,7 @@ from pytoda.smiles.smiles_language import SMILESLanguage
 from torch.utils.data.dataloader import DataLoader
 
 
-class Predictor_DataModule(pl.LightningDataModule):
+class PredictorBA_DataModule(pl.LightningDataModule):
     @classmethod
     def add_argparse_args(
         cls, parent_parser: ArgumentParser, **kwargs
@@ -40,6 +40,18 @@ class Predictor_DataModule(pl.LightningDataModule):
             default="data/pretraining/Predictor/filtered_ligands.smi",
             help="Path to the SMILES data.",
         )
+        parser.add_argument(
+            "--smiles_language_filepath",
+            type=str,
+            default="data/pretraining/language_models/PredictorBA_smiles_language.pkl",
+            help="Path to a pickle of a SMILES language object.",
+        )
+        parser.add_argument(
+            "--protein_language_filepath",
+            type=str,
+            default="data/pretraining/language_models/PredictorBA_protein_language.pkl",
+            help="Path to a pickle of a Protein language object.",
+        )
 
         return parent_parser
 
@@ -53,22 +65,20 @@ class Predictor_DataModule(pl.LightningDataModule):
         smiles_language_filepath,
         protein_language_filepath,
         params_filepath,
-        device,
         *args,
         **kwargs,
     ):
-        super(Predictor_DataModule, self).__init__()
+        super(PredictorBA_DataModule, self).__init__()
         self.train_affinity_filepath = project_filepath + train_affinity_filepath
         self.test_affinity_filepath = project_filepath + test_affinity_filepath
         self.protein_filepath = project_filepath + protein_filepath
         self.smi_filepath = project_filepath + smi_filepath
-        self.smiles_language_filepath = project_filepath + smiles_language_filepath
-        self.protein_language_filepath = project_filepath + protein_language_filepath
+        self.smiles_language_filepath = smiles_language_filepath
+        self.protein_language_filepath = protein_language_filepath
         self.params_filepath = params_filepath
         self.smiles_language = SMILESLanguage.load(self.smiles_language_filepath)
         self.protein_language = ProteinLanguage.load(self.protein_language_filepath)
         self.params = {}
-        self.device = device
 
         # Process parameter file
         with open(self.params_filepath) as f:
@@ -116,7 +126,7 @@ class Predictor_DataModule(pl.LightningDataModule):
                 ),
                 protein_augment_by_revert=protein_augment_by_revert[i],
                 drug_affinity_dtype=th.float,
-                device=self.device,
+                device=th.device("cpu"),
                 backend="eager",
             )
 

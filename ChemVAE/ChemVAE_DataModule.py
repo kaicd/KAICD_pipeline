@@ -20,25 +20,21 @@ class ChemVAE_DataModule(pl.LightningDataModule):
             "--train_smiles_filepath",
             type=str,
             default="data/pretraining/SELFIESVAE/train_chembl_22_clean_1576904_sorted_std_final.smi",
-            help="Path to the drug affinity data.",
         )
         parser.add_argument(
             "--test_smiles_filepath",
             type=str,
             default="data/pretraining/SELFIESVAE/test_chembl_22_clean_1576904_sorted_std_final.smi",
-            help="Path to the drug affinity data.",
         )
         parser.add_argument(
             "--train_dataset_filepath",
             type=str,
             default="preprocessing/ChemVAE_train_dataset_antiviral.pkl",
-            help="Path to the preprocessing drug affinity data.",
         )
         parser.add_argument(
             "--test_dataset_filepath",
             type=str,
             default="preprocessing/ChemVAE_test_dataset_antiviral.pkl",
-            help="Path to the preprocessing drug affinity data.",
         )
 
         return parent_parser
