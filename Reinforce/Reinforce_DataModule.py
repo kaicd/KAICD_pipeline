@@ -3,7 +3,7 @@ import pytorch_lightning as pl
 from torch.utils.data.dataloader import DataLoader
 from typing import Optional, Union, List, Dict
 
-from Utility.utils import ProteinDataset
+from Utility.data_utils import ProteinDataset
 
 
 class Reinforce_DataModule(pl.LightningDataModule):

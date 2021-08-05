@@ -1,13 +1,9 @@
 # load general packages and functions
-from collections import namedtuple
 import math
 import torch as th
 import torch.nn as nn
-
 # load GraphINVENT-specific functions
-from AggregationMPNN import AggregationMPNN
-from EdgeMPNN import EdgeMPNN
-from SummationMPNN import SummationMPNN
+from Utility.mpnns import AggregationMPNN, SummationMPNN, EdgeMPNN
 from Utility.layers import GraphGather, Set2Vec, MLP, GlobalReadout
 
 
@@ -380,8 +376,8 @@ class GGNN(SummationMPNN):
     def readout(
         self,
         hidden_nodes: th.Tensor,
-        input_nodes: h.Tensor,
-        node_mask: h.Tensor,
+        input_nodes: th.Tensor,
+        node_mask: th.Tensor,
     ) -> th.Tensor:
         graph_embeddings = self.gather(hidden_nodes, input_nodes, node_mask)
         output = self.APDReadout(hidden_nodes, graph_embeddings)
@@ -399,6 +395,9 @@ class AttentionGGNN(AggregationMPNN):
         n_node_features: int,
         n_edge_features: int,
         message_size: int,
+        msg_hidden_dim: int,
+        msg_depth: int,
+        msg_dropout_p: float,
         att_hidden_dim: int,
         att_depth: int,
         att_dropout_p: float,
@@ -604,7 +603,7 @@ class EMN(EdgeMPNN):
         )
 
     def preprocess_edges(
-        self, nodes: th.Tensor, node_neihbours: th.Tensor, edges: th.Tensor
+        self, nodes: th.Tensor, node_neighbours: th.Tensor, edges: th.Tensor
     ) -> th.Tensor:
         cat = th.cat((nodes, node_neighbours, edges), dim=1)
         return th.tanh(self.embedding_nn(cat))

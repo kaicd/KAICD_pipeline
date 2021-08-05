@@ -443,21 +443,17 @@ class Set2Vec(nn.Module):
         hidden_node_features: int,
         lstm_computations: int,
         memory_size: int,
-        constants: namedtuple,
     ) -> None:
 
         super().__init__()
 
-        self.constants = constants
         self.lstm_computations = lstm_computations
         self.memory_size = memory_size
-
         self.embedding_matrix = nn.Linear(
             in_features=node_features + hidden_node_features,
             out_features=self.memory_size,
             bias=True,
         )
-
         self.lstm = nn.LSTMCell(
             input_size=self.memory_size, hidden_size=self.memory_size, bias=True
         )
@@ -471,7 +467,7 @@ class Set2Vec(nn.Module):
         """
         Defines forward pass.
         """
-        Softmax = th.nn.Softmax(dim=1)
+        softmax = th.nn.Softmax(dim=1)
 
         batch_size = input_nodes.shape[0]
         energy_mask = th.bitwise_not(node_mask).float() * self.C.big_negative
@@ -497,7 +493,7 @@ class Set2Vec(nn.Module):
             energies = (query.view(batch_size, 1, self.memory_size) * memory).sum(
                 dim=-1
             )
-            attention = Softmax(energies + energy_mask)
+            attention = softmax(energies + energy_mask)
             read = (attention.unsqueeze(-1) * memory).sum(dim=1)
 
             hidden_state = query
