@@ -1,4 +1,6 @@
 # load general packages and functions
+import json
+
 import torch as th
 import torch.nn as nn
 
@@ -9,19 +11,19 @@ class AggregationMPNN(nn.Module):
     defined in `mpnn.py`; these are the attention networks AttS2V and AttGGNN.
     """
 
-    def __init__(
-        self,
-        hidden_node_features: int,
-        n_edge_features: int,
-        message_size: int,
-        message_passes: int,
-    ) -> None:
+    def __init__(self, params: dict) -> None:
         super().__init__()
-
-        self.hidden_node_features = hidden_node_features
-        self.edge_features = n_edge_features
-        self.message_size = message_size
-        self.message_passes = message_passes
+        # load parameters
+        self.params = params
+        self.hidden_node_features = self.params.get("hidden_node_features", 100)
+        self.message_size = self.params.get("message_size", 100)
+        self.message_passes = self.params.get("message_passes", 3)
+        self.big_negative = self.params.get("big_negative", -1e6)
+        self.node_features = self.params.get("node_features", 0)
+        self.edge_features = self.params.get("edge_features", 0)
+        self.len_f_add_per_node = self.params.get("len_f_add_per_node", 0)
+        self.len_f_conn_per_node = self.params.get("len_f_conn_per_node", 0)
+        self.max_n_nodes = self.params.get("max_n_nodes", 0)
 
     def aggregate_message(
         self,
@@ -199,19 +201,19 @@ class SummationMPNN(nn.Module):
     defined in `mpnn.py`; these are MNN, S2V, and GGNN.
     """
 
-    def __init__(
-        self,
-        hidden_node_features: int,
-        n_edge_features: int,
-        message_size: int,
-        message_passes: int,
-    ) -> None:
+    def __init__(self, params: dict) -> None:
         super().__init__()
-
-        self.hidden_node_features = hidden_node_features
-        self.edge_features = n_edge_features
-        self.message_size = message_size
-        self.message_passes = message_passes
+        # load parameters
+        self.params = params
+        self.hidden_node_features = self.params.get("hidden_node_features", 100)
+        self.message_size = self.params.get("message_size", 100)
+        self.message_passes = self.params.get("message_passes", 3)
+        self.big_positive = self.params.get("big_positive", 1e6)
+        self.node_features = self.params.get("node_features", 0)
+        self.edge_features = self.params.get("edge_features", 0)
+        self.len_f_add_per_node = self.params.get("len_f_add_per_node", 0)
+        self.len_f_conn_per_node = self.params.get("len_f_conn_per_node", 0)
+        self.max_n_nodes = self.params.get("max_n_nodes", 0)
 
     def message_terms(
         self, nodes: th.Tensor, node_neighbours: th.Tensor, edges: th.Tensor
@@ -366,19 +368,18 @@ class EdgeMPNN(nn.Module):
     in `mpnn.py`; this is the EMN.
     """
 
-    def __init__(
-        self,
-        edge_features: int,
-        edge_embedding_size: int,
-        message_passes: int,
-        max_n_nodes: int,
-    ) -> None:
+    def __init__(self, params: dict) -> None:
         super().__init__()
-
-        self.edge_features = edge_features
-        self.edge_embedding_size = edge_embedding_size
-        self.message_passes = message_passes
-        self.n_nodes_largest_graph = max_n_nodes
+        # load parameters
+        self.params = params
+        self.hidden_node_features = self.params.get("hidden_node_features", 100)
+        self.edge_emb_size = self.params.get("edge_emb_size", 100)
+        self.big_positive = self.params.get("big_positive", 1e6)
+        self.node_features = self.params.get("node_features", 0)
+        self.edge_features = self.params.get("edge_features", 0)
+        self.len_f_add_per_node = self.params.get("len_f_add_per_node", 0)
+        self.len_f_conn_per_node = self.params.get("len_f_conn_per_node", 0)
+        self.max_n_nodes = self.params.get("max_n_nodes", 0)
 
     def preprocess_edges(
         self, nodes: th.Tensor, node_neighbours: th.Tensor, edges: th.Tensor
@@ -503,12 +504,12 @@ class EdgeMPNN(nn.Module):
         batch_size = adjacency.shape[0]
         n_nodes = adjacency.shape[1]
         max_node_degree = adjacency.sum(-1).max().int()
-        edge_memories = th.zeros(n_edges, self.edge_embedding_size)
+        edge_memories = th.zeros(n_edges, self.edge_emb_size)
 
         ingoing_edge_memories = th.zeros(
             n_edges,
             max_node_degree,
-            self.edge_embedding_size,
+            self.edge_emb_size,
         )
         ingoing_edges_mask = th.zeros(n_edges, max_node_degree)
 
@@ -554,7 +555,7 @@ class EdgeMPNN(nn.Module):
             batch_size,
             n_nodes,
             max_node_degree,
-            self.edge_embedding_size,
+            self.edge_emb_size,
         )
 
         edge_batch_edge_memory_idc = th.cat(

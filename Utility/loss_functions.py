@@ -176,6 +176,32 @@ def joint_loss(
     return joint_loss, rec_loss, kld_loss
 
 
+def gg_loss(output: torch.Tensor, target_output: torch.Tensor) -> float:
+    """
+    The graph generation loss is the KL divergence between the target and predicted actions.
+
+    Args:
+    ----
+        output (torch.Tensor) : Predicted APD tensor.
+        target_output (torch.Tensor) : Target APD tensor.
+
+    Returns:
+    -------
+        loss (float) : Average loss for this output.
+    """
+    # define activation function; note that one must use the softmax in the
+    # KLDiv, never the sigmoid, as the distribution must sum to 1
+    LogSoftmax = nn.LogSoftmax(dim=1)
+    output = LogSoftmax(output)
+    # normalize the target output (as can contain information on > 1 graph)
+    target_output = target_output / torch.sum(target_output, dim=1, keepdim=True)
+    # define loss function and calculate the los
+    criterion = torch.nn.KLDivLoss(reduction="batchmean")
+    loss = criterion(target=target_output, input=output)
+
+    return loss
+
+
 class BCEIgnoreNaN(nn.Module):
     """Wrapper for BCE function that ignores NaNs"""
 

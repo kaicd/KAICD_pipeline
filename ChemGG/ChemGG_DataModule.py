@@ -1,11 +1,9 @@
 from argparse import ArgumentParser
-
+from typing import Optional
 import json
-import h5py
-import torch as th
 import pytorch_lightning as pl
 
-from utils import HDFDataset, BlockDataLoader
+from Utility.data_utils import HDFDataset, BlockDataLoader
 
 
 class ChemGG_DataModule(pl.LightningDataModule):

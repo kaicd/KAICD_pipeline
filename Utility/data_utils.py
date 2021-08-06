@@ -1,5 +1,7 @@
 """Utilities functions."""
 import csv
+import h5py
+from typing import Tuple
 import pandas as pd
 import torch as th
 from torch.utils.data.dataset import Dataset
@@ -38,7 +40,7 @@ def load_ts_properties(csv_path):
 
         # convert any `list`s to `torch.Tensor`s (for consistency)
         if isinstance(properties_dict[tuple_key], list):
-            properties_dict[tuple_key] = torch.Tensor(properties_dict[tuple_key])
+            properties_dict[tuple_key] = th.Tensor(properties_dict[tuple_key])
 
     return properties_dict
 
@@ -101,6 +103,21 @@ class BlockDataset(Dataset):
     def __len__(self) -> int:
         # returns the number of blocks in the dataset
         return (len(self.dataset) + self.block_size - 1) // self.block_size
+
+
+class ShuffleBlockWrapper:
+    """
+    Extra class used to wrap a block of data, enabling data to get shuffled *within* a block.
+    """
+
+    def __init__(self, data: th.Tensor) -> None:
+        self.data = data
+
+    def __getitem__(self, idx: int) -> th.Tensor:
+        return [d[idx] for d in self.data]
+
+    def __len__(self) -> int:
+        return len(self.data[0])
 
 
 class BlockDataLoader(DataLoader):

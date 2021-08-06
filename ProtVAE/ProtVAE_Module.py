@@ -3,8 +3,8 @@ import json
 import torch as th
 import pytorch_lightning as pl
 
-from .DenseEncoder import DenseEncoder
-from .DenseDecoder import DenseDecoder
+from ProtVAE.DenseEncoder import DenseEncoder
+from ProtVAE.DenseDecoder import DenseDecoder
 from Utility.hyperparams import LOSS_FN_FACTORY
 from Utility.hyperparams import OPTIMIZER_FACTORY
 from Utility.loss_functions import joint_loss

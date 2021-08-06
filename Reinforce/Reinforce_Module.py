@@ -12,7 +12,7 @@ from wandb import Image, Table
 from PIL import Image as pilimg
 
 from .Reinforce_Base import Reinforce_Base
-from Utility.utils import generate_mols_img, plot_and_compare_proteins
+from Utility.logging import generate_mols_img, plot_and_compare_proteins
 
 
 class Reinforce_Module(Reinforce_Base):

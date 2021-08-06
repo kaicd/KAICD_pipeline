@@ -12,7 +12,7 @@ from pytoda.transforms import LeftPadding, ToTensor
 from pytoda.proteins.protein_language import ProteinLanguage
 from pytoda.smiles.smiles_language import SMILESLanguage
 
-from Utility.utils import ProteinDataset
+from Utility.data_utils import ProteinDataset
 from ChemVAE.ChemVAE_Module import ChemVAE_Module
 from ProtVAE.ProtVAE_Module import ProtVAE_Module
 from Predictor.PredictorBA_Module import PredictorBA_Module

@@ -1,26 +1,19 @@
 """Utilities functions."""
-import os
 import copy
 import logging
 import random
 import math
 from math import ceil, cos, sin
+from typing import Union, Tuple
 
 import numpy as np
 import pandas as pd
-from PIL import Image as pilimg
-import matplotlib.patches as mpatches
-import matplotlib.pyplot as plt
-import seaborn as sns
-import torch
+import torch as th
 import torch.nn as nn
-from torch.autograd import Variable
 from torch.distributions.normal import Normal
 from torch.distributions.bernoulli import Bernoulli
-from torch.utils.data.dataset import Dataset
-from rdkit.Chem import Draw
-import rdkit.rdBase as rkrb
-import rdkit.RDLogger as rkl
+from rdkit.Chem.rdchem import BondType
+
 import pytoda
 from pytoda.transforms import Compose
 
@@ -40,7 +33,7 @@ def sequential_data_preparation(
     Sequential Training Data Builder.
 
     Args:
-        input_batch (torch.Tensor): Batch of padded sequences, output of
+        input_batch (th.Tensor): Batch of padded sequences, output of
             nn.utils.rnn.pad_sequence(batch) of size
             `[sequence length, batch_size, 1]`.
         input_keep (float): The probability not to drop input sequence tokens
@@ -49,15 +42,15 @@ def sequential_data_preparation(
         start_index (int): The index of the sequence start token.
         end_index (int): The index of the sequence end token.
         dropout_index (int): The index of the dropout token. Defaults to 1.
-        device (torch.device): Device to be used.
+        device (th.device): Device to be used.
     Returns:
-    (torch.Tensor, torch.Tensor, torch.Tensor): encoder_seq, decoder_seq,
+    (th.Tensor, th.Tensor, th.Tensor): encoder_seq, decoder_seq,
         target_seq
         encoder_seq is a batch of padded input sequences starting with the
             start_index, of size `[sequence length +1, batch_size]`.
         decoder_seq is like encoder_seq but word dropout is applied
             (so if input_keep==1, then decoder_seq = encoder_seq).
-        target_seq (torch.Tensor): Batch of padded target sequences ending
+        target_seq (th.Tensor): Batch of padded target sequences ending
             in the end_index, of size `[sequence length +1, batch_size]`.
     """
     batch_size = input_batch.shape[1]
@@ -66,18 +59,18 @@ def sequential_data_preparation(
     # apply token dropout if keep != 1
     if input_keep != 1:
         # build dropout indices consisting of dropout_index
-        dropout_indices = torch.LongTensor(
-            dropout_index * torch.ones(1, batch_size).numpy()
+        dropout_indices = th.LongTensor(
+            dropout_index * th.ones(1, batch_size).numpy()
         )
         # mask for token dropout
         mask = Bernoulli(input_keep).sample((input_batch.shape[0],))
-        mask = torch.LongTensor(mask.numpy())
+        mask = th.LongTensor(mask.numpy())
         dropout_loc = np.where(mask == 0)[0]
 
         decoder_batch[dropout_loc] = dropout_indices
 
-    end_padding = torch.LongTensor(torch.zeros(1, batch_size).numpy())
-    target_seq = torch.cat((input_batch[1:, :], end_padding), dim=0)
+    end_padding = th.LongTensor(th.zeros(1, batch_size).numpy())
+    target_seq = th.cat((input_batch[1:, :], end_padding), dim=0)
     target_seq = copy.deepcopy(target_seq).to(device)
 
     return input_batch, decoder_batch, target_seq
@@ -95,7 +88,7 @@ def packed_sequential_data_preparation(
     Sequential Training Data Builder.
 
     Args:
-        input_batch (torch.Tensor): Batch of padded sequences, output of
+        input_batch (th.Tensor): Batch of padded sequences, output of
             nn.utils.rnn.pad_sequence(batch) of size
             `[sequence length, batch_size, 1]`.
         input_keep (float): The probability not to drop input sequence tokens
@@ -106,14 +99,14 @@ def packed_sequential_data_preparation(
         dropout_index (int): The index of the dropout token. Defaults to 1.
 
     Returns:
-    (torch.Tensor, torch.Tensor, torch.Tensor): encoder_seq, decoder_seq,
+    (th.Tensor, th.Tensor, th.Tensor): encoder_seq, decoder_seq,
         target_seq
 
         encoder_seq is a batch of padded input sequences starting with the
             start_index, of size `[sequence length +1, batch_size, 1]`.
         decoder_seq is like encoder_seq but word dropout is applied
             (so if input_keep==1, then decoder_seq = encoder_seq).
-        target_seq (torch.Tensor): Batch of padded target sequences ending
+        target_seq (th.Tensor): Batch of padded target sequences ending
             in the end_index, of size `[sequence length +1, batch_size, 1]`.
     """
 
@@ -127,13 +120,13 @@ def packed_sequential_data_preparation(
         if input_keep != 1:
             # mask for token dropout
             mask = Bernoulli(input_keep).sample(input.shape)
-            mask = torch.LongTensor(mask.numpy())
+            mask = th.LongTensor(mask.numpy())
             dropout_loc = np.where(mask == 0)[0]
             decoder[dropout_loc] = dropout_index
 
         # just .clone() propagates to graph
-        target = torch.cat(
-            [input[1:].detach().clone(), torch.Tensor([0]).long().to(device)]
+        target = th.cat(
+            [input[1:].detach().clone(), th.Tensor([0]).long().to(device)]
         )
         return input, decoder, target.to(device)
 
@@ -141,7 +134,7 @@ def packed_sequential_data_preparation(
 
     encoder_decoder_target = zip(*batch)
     encoder_decoder_target = [
-        torch.nn.utils.rnn.pack_sequence(entry) for entry in encoder_decoder_target
+        th.nn.utils.rnn.pack_sequence(entry) for entry in encoder_decoder_target
     ]
     return encoder_decoder_target
 
@@ -150,7 +143,7 @@ def collate_fn(batch):
     """
     Collate function for DataLoader.
 
-    Note: to be used as collate_fn in torch.utils.data.DataLoader.
+    Note: to be used as collate_fn in th.utils.data.DataLoader.
 
     Args:
         batch: Batch of sequences.
@@ -177,24 +170,24 @@ def packed_to_padded(seq, target_packed):
         longest sequence has length 6 and only 3/8 samples have length 3.
         target_packed {list} -- Packed target sequence
     Return:
-        torch.Tensor: Shape bs x T (padded with 0)
+        th.Tensor: Shape bs x T (padded with 0)
 
     NOTE:
         Assumes that padding index is 0 and stop_index is 3
     """
     T = len(seq)
     batch_size = len(seq[0])
-    padded = torch.zeros(batch_size, T)
+    padded = th.zeros(batch_size, T)
 
     stopped_idx = []
-    target_packed += [torch.Tensor()]
+    target_packed += [th.Tensor()]
     # Loop over tokens per time step
     for t in range(T):
         seq_lst = seq[t].tolist()
         tg_lst = target_packed[t - 1].tolist()
         # Insert Padding token where necessary
         [seq_lst.insert(idx, 0) for idx in sorted(stopped_idx, reverse=False)]
-        padded[:, t] = torch.Tensor(seq_lst).long()
+        padded[:, t] = th.Tensor(seq_lst).long()
 
         stop_idx = list(filter(lambda x: tg_lst[x] == 3, range(len(tg_lst))))
         stopped_idx += stop_idx
@@ -203,12 +196,12 @@ def packed_to_padded(seq, target_packed):
 
 
 def unpack_sequence(seq):
-    tensor_seqs, seq_lens = torch.nn.utils.rnn.pad_packed_sequence(seq)
+    tensor_seqs, seq_lens = th.nn.utils.rnn.pad_packed_sequence(seq)
     return [s[:l] for s, l in zip(tensor_seqs.unbind(dim=1), seq_lens)]
 
 
 def repack_sequence(seq):
-    return torch.nn.utils.rnn.pack_sequence(seq)
+    return th.nn.utils.rnn.pack_sequence(seq)
 
 
 def perpare_packed_input(input):
@@ -270,9 +263,9 @@ def to_np(x):
 def crop_start_stop(smiles, smiles_language):
     """
     Arguments:
-        smiles {torch.Tensor} -- Shape 1 x T
+        smiles {th.Tensor} -- Shape 1 x T
     Returns:
-        smiles {torch.Tensor} -- Cropped away everything outside Start/Stop.
+        smiles {th.Tensor} -- Cropped away everything outside Start/Stop.
     """
     smiles = smiles.tolist()
     try:
@@ -286,9 +279,9 @@ def crop_start_stop(smiles, smiles_language):
 def crop_start(smiles, smiles_language):
     """
     Arguments:
-        smiles {torch.Tensor} -- Shape 1 x T
+        smiles {th.Tensor} -- Shape 1 x T
     Returns:
-        smiles {torch.Tensor} -- Cropped away everything outside Start/Stop.
+        smiles {th.Tensor} -- Cropped away everything outside Start/Stop.
     """
     smiles = smiles.tolist()
     try:
@@ -330,7 +323,7 @@ def print_example_reconstruction(
         reconstructed = crop_start(reconstruction[sample_idx], language)
 
     # In padding mode input is tensor
-    if isinstance(inp, torch.Tensor):
+    if isinstance(inp, th.Tensor):
         inp = inp.permute(1, 0)
     elif not isinstance(inp, list):
         raise TypeError(f"Unknown input type {type(inp)}")
@@ -340,15 +333,6 @@ def print_example_reconstruction(
     target = _fn(sample)
 
     return target, pred
-
-
-def disable_rdkit_logging():
-    """
-    Disables RDKit whiny logging.
-    """
-    logger = rkl.logger()
-    logger.setLevel(rkl.ERROR)
-    rkrb.DisableLog("rdApp.error")
 
 
 def add_avg_profile(omics_df):
@@ -410,157 +394,6 @@ def omics_data_splitter(omics_df, site, test_fraction):
     return train_cell_lines.tolist(), test_cell_lines.tolist()
 
 
-def plot_and_compare(
-    unbiased_preds, biased_preds, site, cell_line, epoch, save_path, mode, bs
-):
-    biased_ratio = np.round(100 * (np.sum(biased_preds < 0) / len(biased_preds)), 1)
-    unbiased_ratio = np.round(
-        100 * (np.sum(unbiased_preds < 0) / len(unbiased_preds)), 1
-    )
-    print(f"Site: {site}, cell line: {cell_line}")
-    print(f"NAIVE - {mode}: Percentage of effective compounds = {unbiased_ratio}")
-    print(f"BIASED - {mode}: Percentage of effective compounds = {biased_ratio}")
-
-    fig, ax = plt.subplots()
-    sns.kdeplot(
-        unbiased_preds, shade=True, color="grey", label=f"Unbiased: {unbiased_ratio}% "
-    )
-    sns.kdeplot(
-        biased_preds, shade=True, color="red", label=f"Optimized: {biased_ratio}% "
-    )
-    valid = f"SMILES validity: \n {round((len(biased_preds)/bs) * 100, 1)}%"
-    txt = "$\mathbf{Drug \ efficacy}$: "
-    handles, labels = plt.gca().get_legend_handles_labels()
-    patch = mpatches.Patch(color="none", label=txt)
-
-    handles.insert(0, patch)  # add new patches and labels to list
-    labels.insert(0, txt)
-
-    plt.legend(handles, labels, loc="upper right")
-    plt.xlabel("Predicted log(micromolar IC50)")
-    plt.ylabel(f"Density of generated molecules (n={bs})")
-    t1 = "PaccMann$^{\mathrm{RL}}$ "
-    s = site.replace("_", " ")
-    c = cell_line.replace("_", " ")
-    t2 = f"generator for {s} cancer. (cell: {c})"
-    plt.title(t1 + t2, size=13)
-    plt.text(0.67, 0.70, valid, weight="bold", transform=plt.gca().transAxes)
-    plt.text(
-        0.05,
-        0.8,
-        "Effective compounds",
-        weight="bold",
-        color="grey",
-        transform=plt.gca().transAxes,
-    )
-    ax.axvspan(-10, 0, alpha=0.5, color=[0.85, 0.85, 0.85])
-    plt.xlim([-4, 8])
-    plt.savefig(
-        os.path.join(
-            save_path,
-            f"results/{mode}_{cell_line}_epoch_{epoch}_eff_{biased_ratio}.pdf",
-        )
-    )
-    plt.clf()
-
-
-def plot_and_compare_proteins(
-    unbiased_preds, biased_preds, protein, epoch, save_path, mode, bs
-):
-
-    biased_ratio = np.round(100 * (np.sum(biased_preds > 0.5) / len(biased_preds)), 1)
-    unbiased_ratio = np.round(
-        100 * (np.sum(unbiased_preds > 0.5) / len(unbiased_preds)), 1
-    )
-    print(f"NAIVE - {mode}: Percentage of binding compounds = {unbiased_ratio}")
-    print(f"BIASED - {mode}: Percentage of binding compounds = {biased_ratio}")
-
-    fig, ax = plt.subplots()
-    sns.distplot(
-        unbiased_preds,
-        kde_kws={
-            "shade": True,
-            "alpha": 0.5,
-            "linewidth": 2,
-            "clip": [0, 1],
-            "kernel": "cos",
-        },
-        color="grey",
-        label=f"Unbiased: {unbiased_ratio}% ",
-        kde=True,
-        rug=True,
-        hist=False,
-    )
-    sns.distplot(
-        biased_preds,
-        kde_kws={
-            "shade": True,
-            "alpha": 0.5,
-            "linewidth": 2,
-            "clip": [0, 1],
-            "kernel": "cos",
-        },
-        color="red",
-        label=f"Optimized: {biased_ratio}% ",
-        kde=True,
-        rug=True,
-        hist=False,
-    )
-    valid = f"SMILES validity: {round((len(biased_preds)/bs) * 100, 1)}%"
-    txt = "$\mathbf{Drug \ binding}$: "
-    handles, labels = plt.gca().get_legend_handles_labels()
-    patch = mpatches.Patch(color="none", label=txt)
-
-    handles.insert(0, patch)  # add new patches and labels to list
-    labels.insert(0, txt)
-
-    plt.legend(handles, labels, loc="upper left")
-    plt.xlabel("Predicted binding probability")
-    plt.ylabel(f"Density of generated molecules")
-    t1 = "PaccMann$^{\mathrm{RL}}$ "
-    # protein_name = '_'.join(protein.split('=')[1].split('-')[:-1])
-    # organism = protein.split('=')[-1]
-    # t2 = f'generator for: {protein_name}\n({organism})'
-    protein_name = protein
-    t2 = f"generator for: {protein_name}\n"
-    plt.title(t1 + t2, size=10)
-    plt.text(
-        0.55,
-        0.95,
-        "Predicted as binding",
-        weight="bold",
-        color="grey",
-        transform=plt.gca().transAxes,
-    )
-    ax.axvspan(0.5, 1.2, alpha=0.5, color=[0.85, 0.85, 0.85])
-    plt.xlim([0.0, 1.0])
-    plt.savefig(
-        os.path.join(
-            save_path,
-            f"{mode}_{protein}_epoch_{epoch}_eff_{biased_ratio}.png",
-        )
-    )
-    plt.clf()
-
-
-def plot_loss(loss, reward, epoch, cell_line, save_path, rolling=1, site="unknown"):
-    loss = pd.Series(loss).rolling(rolling).mean()
-    rewards = pd.Series(reward).rolling(rolling).mean()
-
-    plt.plot(np.arange(len(loss)), loss, color="r")
-    plt.ylabel("RL-loss (log softmax)", size=12).set_color("r")
-    plt.xlabel("Training steps", size=12)
-    # Plot KLD on second y axis
-    _ = plt.twinx()
-    s = site.replace("_", " ")
-    _ = cell_line.replace("_", " ")
-    plt.plot(np.arange(len(rewards)), rewards, color="g")
-    plt.ylabel("Achieved rewards", size=12).set_color("g")
-    plt.title("PaccMann$^{\mathrm{RL}}$ generator for " + s + " cancer")
-    plt.savefig(os.path.join(save_path, f"results/loss_ep_{epoch}_cell_{cell_line}"))
-    plt.clf()
-
-
 def gaussian_mixture(batchsize, ndim, num_labels=8):
     """Generate gaussian mixture data.
 
@@ -575,7 +408,7 @@ def gaussian_mixture(batchsize, ndim, num_labels=8):
         Exception: ndim is not a multiple of 2.
 
     Returns:
-        torch.Tensor: samples
+        th.Tensor: samples
     """
     if ndim % 2 != 0:
         raise Exception("ndim must be a multiple of 2.")
@@ -602,21 +435,21 @@ def gaussian_mixture(batchsize, ndim, num_labels=8):
                 random.randint(0, num_labels - 1),
                 num_labels,
             )
-    return torch.Tensor(z)
+    return th.Tensor(z)
 
 
 def augment(x, dropout=0.0, sigma=0.0):
     """Performs augmentation on the input data batch x.
 
     Args:
-        x (torch.Tensor): Input of shape `[batch_size, input size]`.
+        x (th.Tensor): Input of shape `[batch_size, input size]`.
         dropout (float, optional): Probability for each input value to be 0.
             Defaults to 0.
         sigma (float, optional): Variance of added gaussian noise to x
             (x' = x + N(0,sigma). Defaults to 0.
 
     Returns:
-        torch.Tensor: Augmented data
+        th.Tensor: Augmented data
     """
     f = nn.Dropout(p=dropout, inplace=True)
     return f(x).add_(Normal(0, sigma).sample(x.shape).to(x.device))
@@ -626,21 +459,21 @@ def attention_list_to_matrix(coding_tuple, dim=2):
     """[summary]
 
     Args:
-        coding_tuple (list((torch.Tensor, torch.Tensor))): iterable of
+        coding_tuple (list((th.Tensor, th.Tensor))): iterable of
             (outputs, att_weights) tuples coming from the attention function
         dim (int, optional): The dimension along which expansion takes place to
             concatenate the attention weights. Defaults to 2.
 
     Returns:
-        (torch.Tensor, torch.Tensor): raw_coeff, coeff
+        (th.Tensor, th.Tensor): raw_coeff, coeff
 
         raw_coeff: with the attention weights of all multiheads and
             convolutional kernel sizes concatenated along the given dimension,
             by default the last dimension.
         coeff: where the dimension is collapsed by averaging.
     """
-    raw_coeff = torch.cat([torch.unsqueeze(tpl[1], 2) for tpl in coding_tuple], dim=dim)
-    return raw_coeff, torch.mean(raw_coeff, dim=dim)
+    raw_coeff = th.cat([th.unsqueeze(tpl[1], 2) for tpl in coding_tuple], dim=dim)
+    return raw_coeff, th.mean(raw_coeff, dim=dim)
 
 
 def get_log_molar(y, ic50_max=None, ic50_min=None):
@@ -650,32 +483,257 @@ def get_log_molar(y, ic50_max=None, ic50_min=None):
     return y * (ic50_max - ic50_min) + ic50_min
 
 
-def generate_mols_img(mols, sub_img_size=(512, 512), legends=None, row=2, **kwargs):
-    if legends is None:
-        legends = [None] * len(mols)
-    res = pilimg.new(
-        "RGBA",
-        (
-            sub_img_size[0] * row,
-            sub_img_size[1] * (len(mols) // row)
-            if len(mols) % row == 0
-            else sub_img_size[1] * ((len(mols) // row) + 1),
-        ),
+def get_feature_dimensions(params: dict):
+    """
+       Returns dimensions of all node features.
+    """
+    n_atom_types = len(params["atom_types"])
+    n_formal_charge = len(params["formal_charge"])
+    n_numh = int(not params["use_explicit_H"] and not params["ignore_H"]) * len(
+        params["imp_H"]
     )
-    for i, mol in enumerate(mols):
-        res.paste(
-            Draw.MolToImage(mol, sub_img_size, legend=legends[i], **kwargs),
-            ((i // row) * sub_img_size[0], (i % row) * sub_img_size[1]),
-        )
+    n_chirality = int(params["use_chirality"]) * len(params["chirality"])
 
-    return res
+    return n_atom_types, n_formal_charge, n_numh, n_chirality
+
+
+def get_tensor_dimensions(
+    n_atom_types: int,
+    n_formal_charge: int,
+    n_num_h: int,
+    n_chirality: int,
+    n_node_features: int,
+    n_edge_features: int,
+    params: dict,
+):
+    """
+    Returns dimensions for all tensors that describe molecular graphs. Tensor dimensions are
+    `list`s, except for `dim_f_term` which is  simply an `int`. Each element of the lists indicate
+    the corresponding dimension of a particular subgraph matrix (i.e. `nodes`, `f_add`, etc).
+    """
+    max_nodes = params["max_n_nodes"]
+    # define the matrix dimensions as `list`s
+    # first for the graph reps...
+    dim_nodes = [max_nodes, n_node_features]
+    dim_edges = [max_nodes, max_nodes, n_edge_features]
+    # ... then for the APDs
+    if params["use_chirality"]:
+        if params["use_explicit_H"] or params["ignore_H"]:
+            dim_f_add = [
+                params["max_n_nodes"],
+                n_atom_types,
+                n_formal_charge,
+                n_chirality,
+                n_edge_features,
+            ]
+        else:
+            dim_f_add = [
+                params["max_n_nodes"],
+                n_atom_types,
+                n_formal_charge,
+                n_num_h,
+                n_chirality,
+                n_edge_features,
+            ]
+    else:
+        if params["use_explicit_H"] or params["ignore_H"]:
+            dim_f_add = [
+                params["max_n_nodes"],
+                n_atom_types,
+                n_formal_charge,
+                n_edge_features,
+            ]
+        else:
+            dim_f_add = [
+                params["max_n_nodes"],
+                n_atom_types,
+                n_formal_charge,
+                n_num_h,
+                n_edge_features,
+            ]
+    dim_f_conn = [params["max_n_nodes"], n_edge_features]
+    dim_f_term = 1
+
+    return dim_nodes, dim_edges, dim_f_add, dim_f_conn, dim_f_term
+
+
+def get_feature_vector_indices(params: dict) -> list:
+    """
+    Gets the indices of the different segments of the feature vector. The indices are
+    analogous to the lengths of the various segments.
+
+    Returns:
+    -------
+        idc (list) : Contains the indices of the different one-hot encoded segments used in the
+          feature vector representations of nodes in `MolecularGraph`s. These segments are, in
+          order, atom type, formal charge, number of implicit Hs, and chirality.
+    """
+    idc = [params["n_atom_types"], params["n_formal_charge"]]
+
+    # indices corresponding to implicit H's and chirality are optional (below)
+    if not params["use_explicit_H"] and not params["ignore_H"]:
+        idc.append(params["n_imp_H"])
+
+    if params["use_chirality"]:
+        idc.append(params["n_chirality"])
+
+    return np.cumsum(idc).tolist()
+
+
+def normalize_evaluation_metrics(
+    params: dict, prop_dict: dict, epoch_key: str
+) -> Tuple[th.Tensor]:
+    """
+    Normalizes histograms in `props_dict`, converts them to `list`s (from `th.Tensor`s)
+    and rounds the elements. This is done for clarity when saving the histograms to CSV.
+
+    Returns:
+    -------
+        norm_n_nodes_hist (th.Tensor) : Normalized histogram of the number of
+          nodes per molecule.
+        norm_atom_type_hist (th.Tensor) : Normalized histogram of the atom
+          types present in the molecules.
+        norm_charge_hist (th.Tensor) : Normalized histogram of the formal
+          charges present in the molecules.
+        norm_numh_hist (th.Tensor) : Normalized histogram of the number of
+          implicit hydrogens present in the molecules.
+        norm_n_edges_hist (th.Tensor) : Normalized histogram of the number of
+          edges per node in the molecules.
+        norm_edge_feature_hist (th.Tensor) : Normalized histogram of the
+          edge features (types of bonds) present in the molecules.
+        norm_chirality_hist (th.Tensor) : Normalized histogram of the
+          chiral centers present in the molecules.
+    """
+    # compute histograms for non-optional features
+    norm_n_nodes_hist = [
+        round(i, 2) for i in norm(prop_dict[(epoch_key, "n_nodes_hist")]).tolist()
+    ]
+    norm_atom_type_hist = [
+        round(i, 2) for i in norm(prop_dict[(epoch_key, "atom_type_hist")]).tolist()
+    ]
+    norm_charge_hist = [
+        round(i, 2) for i in norm(prop_dict[(epoch_key, "formal_charge_hist")]).tolist()
+    ]
+    norm_n_edges_hist = [
+        round(i, 2) for i in norm(prop_dict[(epoch_key, "n_edges_hist")]).tolist()
+    ]
+    norm_edge_feature_hist = [
+        round(i, 2) for i in norm(prop_dict[(epoch_key, "edge_feature_hist")]).tolist()
+    ]
+    # compute histograms for optional features
+    if not params["use_explicit_H"] and not params["ignore_H"]:
+        norm_numh_hist = [
+            round(i, 2) for i in norm(prop_dict[(epoch_key, "numh_hist")]).tolist()
+        ]
+    else:
+        norm_numh_hist = [0] * len(params["imp_H"])
+    if params["use_chirality"]:
+        norm_chirality_hist = [
+            round(i, 2) for i in norm(prop_dict[(epoch_key, "chirality_hist")]).tolist()
+        ]
+    else:
+        norm_chirality_hist = [1, 0, 0]
+    return (
+        norm_n_nodes_hist,
+        norm_atom_type_hist,
+        norm_charge_hist,
+        norm_numh_hist,
+        norm_n_edges_hist,
+        norm_edge_feature_hist,
+        norm_chirality_hist,
+    )
+
+
+def norm(list_of_nums: list) -> list:
+    """
+    Normalizes input `list_of_nums` (`list` of `float`s or `int`s)
+    """
+    try:
+        norm_list_of_nums = list_of_nums / sum(list_of_nums)
+    except:  # occurs if divide by zero
+        norm_list_of_nums = list_of_nums
+    return norm_list_of_nums
+
+
+def one_of_k_encoding(x: Union[str, int], allowable_set: list) -> "generator":
+    """Returns the one-of-k encoding of a value `x` having a range of possible
+    values in `allowable_set`.
+
+    Args:
+      x (str, int) : Value to be one-hot encoded.
+      allowable_set (list) : `list` of all possible values.
+
+    Returns:
+      one_hot_generator (generator) : One-hot encoding. A generator of `int`s.
+    """
+    if x not in set(allowable_set):  # use set for speedup over list
+        raise Exception(
+            f"Input {x} not in allowable set {allowable_set}. Add {x} to allowable "
+            f"set in either a) `features.py` or b) your submission script (`submit.py`) "
+            f"and run again."
+        )
+    one_hot_generator = (int(x == s) for s in allowable_set)
+    return one_hot_generator
+
+
+def update_features(params):
+    update_params = params
+    # define node features
+    n_atom_types, n_formal_charge, n_imp_H, n_chirality = get_feature_dimensions(update_params)
+    node_features = n_atom_types + n_formal_charge + n_imp_H + n_chirality
+    # define edge features
+    bondtype_to_int = {BondType.SINGLE: 0, BondType.DOUBLE: 1, BondType.TRIPLE: 2}
+    if update_params.get("use_aromatic_bonds", True):
+        bondtype_to_int[BondType.AROMATIC] = 3
+    int_to_bondtype = dict(map(reversed, bondtype_to_int.items()))
+    edge_features = len(bondtype_to_int)
+    # define matrix dimensions
+    dim_nodes, dim_edges, dim_f_add, dim_f_conn, dim_f_term = get_tensor_dimensions(
+        n_atom_types,
+        n_formal_charge,
+        n_imp_H,
+        n_chirality,
+        node_features,
+        edge_features,
+        update_params,
+    )
+    len_f_add = np.prod(dim_f_add[:])
+    len_f_add_per_node = np.prod(dim_f_add[1:])
+    len_f_conn = np.prod(dim_f_conn[:])
+    len_f_conn_per_node = np.prod(dim_f_conn[1:])
+    # update params
+    feature_params = {
+        "big_negative": -1e6,
+        "big_positive": 1e6,
+        "bondtype_to_int": bondtype_to_int,
+        "int_to_bondtype": int_to_bondtype,
+        "edge_features": edge_features,
+        "n_atom_types": n_atom_types,
+        "n_formal_charge": n_formal_charge,
+        "n_imp_H": n_imp_H,
+        "n_chirality": n_chirality,
+        "node_features": node_features,
+        "dim_nodes": dim_nodes,
+        "dim_edges": dim_edges,
+        "dim_f_add": dim_f_add,
+        "dim_f_conn": dim_f_conn,
+        "dim_f_term": dim_f_term,
+        "dim_apd": [np.prod(dim_f_add) + np.prod(dim_f_conn) + 1],
+        "len_f_add": len_f_add,
+        "len_f_add_per_node": len_f_add_per_node,
+        "len_f_conn": len_f_conn,
+        "len_f_conn_per_node": len_f_conn_per_node,
+    }
+    update_params.update(feature_params)
+
+    return update_params
 
 
 class Squeeze(nn.Module):
     """Squeeze wrapper for nn.Sequential."""
 
     def forward(self, data):
-        return torch.squeeze(data)
+        return th.squeeze(data)
 
 
 class Unsqueeze(nn.Module):
@@ -686,7 +744,7 @@ class Unsqueeze(nn.Module):
         self.axis = axis
 
     def forward(self, data):
-        return torch.unsqueeze(data, self.axis)
+        return th.unsqueeze(data, self.axis)
 
 
 class Temperature(nn.Module):

@@ -13,48 +13,40 @@ class MNN(SummationMPNN):
     The "message neural network" model.
     """
 
-    def __init__(
-        self,
-        hidden_node_features: int,
-        n_edge_features: int,
-        message_size: int,
-        mlp1_hidden_dim: int,
-        mlp1_depth: int,
-        mlp1_dropout_p: float,
-        mlp2_hidden_dim: int,
-        mlp2_depth: int,
-        mlp2_dropout_p: float,
-        len_f_add_per_node: int,
-        len_f_conn_per_node: int,
-        max_n_nodes: int,
-    ) -> None:
+    def __init__(self) -> None:
         super(MNN, self).__init__()
 
+        mlp1_hidden_dim = self.params.get("mlp1_hidden_dim", 500)
+        mlp1_depth = self.params.get("mlp1_depth", 4)
+        mlp1_dropout_p = self.params.get("mlp1_dropout_p", 0.0)
+        mlp2_hidden_dim = self.params.get("mlp2_hidden_dim", 500)
+        mlp2_depth = self.params.get("mlp2_depth", 4)
+        mlp2_dropout_p = self.params.get("mlp2_dropout_p", 0.0)
+
         message_weights = th.Tensor(
-            message_size,
-            hidden_node_features,
-            n_edge_features,
+            self.message_size,
+            self.hidden_node_features,
+            self.edge_features,
         )
         self.message_weights = nn.Parameter(message_weights)
-        self.n_edge_features = n_edge_features
         self.gru = nn.GRUCell(
-            input_size=message_size,
-            hidden_size=hidden_node_features,
+            input_size=self.message_size,
+            hidden_size=self.hidden_node_features,
             bias=True,
         )
         self.APDReadout = GlobalReadout(
-            node_emb_size=hidden_node_features,
-            graph_emb_size=hidden_node_features,
+            node_emb_size=self.hidden_node_features,
+            graph_emb_size=self.hidden_node_features,
             mlp1_hidden_dim=mlp1_hidden_dim,
             mlp1_depth=mlp1_depth,
             mlp1_dropout_p=mlp1_dropout_p,
             mlp2_hidden_dim=mlp2_hidden_dim,
             mlp2_depth=mlp2_depth,
             mlp2_dropout_p=mlp2_dropout_p,
-            f_add_elems=len_f_add_per_node,
-            f_conn_elems=len_f_conn_per_node,
+            f_add_elems=self.len_f_add_per_node,
+            f_conn_elems=self.len_f_conn_per_node,
             f_term_elems=1,
-            max_n_nodes=max_n_nodes,
+            max_n_nodes=self.max_n_nodes,
         )
         self.reset_parameters()
 
@@ -88,50 +80,41 @@ class S2V(SummationMPNN):
     The "set2vec" model.
     """
 
-    def __init__(
-        self,
-        hidden_node_features: int,
-        n_node_features: int,
-        n_edge_features: int,
-        message_size: int,
-        enn_hidden_dim: int,
-        enn_depth: int,
-        enn_dropout_p: float,
-        s2v_lstm_computations: int,
-        s2v_memory_size: int,
-        mlp1_hidden_dim: int,
-        mlp1_depth: int,
-        mlp1_dropout_p: float,
-        mlp2_hidden_dim: int,
-        mlp2_depth: int,
-        mlp2_dropout_p: float,
-        len_f_add_per_node: int,
-        len_f_conn_per_node: int,
-        max_n_nodes: int,
-    ) -> None:
+    def __init__(self) -> None:
         super(S2V, self).__init__()
 
-        self.hidden_node_features = hidden_node_features
-        self.message_size = message_size
+        enn_hidden_dim = self.params.get("enn_hidden_dim", 250)
+        enn_depth = self.params.get("enn_depth", 4)
+        enn_dropout_p = self.params.get("enn_dropout_p", 0.0)
+        mlp1_hidden_dim = self.params.get("mlp1_hidden_dim", 500)
+        mlp1_depth = self.params.get("mlp1_depth", 4)
+        mlp1_dropout_p = self.params.get("mlp1_dropout_p", 0.0)
+        mlp2_hidden_dim = self.params.get("mlp2_hidden_dim", 500)
+        mlp2_depth = self.params.get("mlp2_depth", 4)
+        mlp2_dropout_p = self.params.get("mlp2_dropout_p", 0.0)
+        s2v_memory_size = self.params.get("s2v_memory_size", 100)
+        s2v_lstm_computations = self.params.get("s2v_lstm_computations", 3)
+
+        self.hidden_node_features = self.hidden_node_features
         self.enn = MLP(
-            in_features=n_edge_features,
+            in_features=self.edge_features,
             hidden_layer_sizes=[enn_hidden_dim] * enn_depth,
-            out_features=hidden_node_features * message_size,
+            out_features=self.hidden_node_features * self.message_size,
             dropout_p=enn_dropout_p,
         )
         self.gru = nn.GRUCell(
-            input_size=message_size,
-            hidden_size=hidden_node_features,
+            input_size=self.message_size,
+            hidden_size=self.hidden_node_features,
             bias=True,
         )
         self.s2v = Set2Vec(
-            node_features=n_node_features,
-            hidden_node_features=hidden_node_features,
+            node_features=self.node_features,
+            hidden_node_features=self.hidden_node_features,
             lstm_computations=s2v_lstm_computations,
             memory_size=s2v_memory_size,
         )
         self.APDReadout = GlobalReadout(
-            node_emb_size=hidden_node_features,
+            node_emb_size=self.hidden_node_features,
             graph_emb_size=s2v_memory_size * 2,
             mlp1_hidden_dim=mlp1_hidden_dim,
             mlp1_depth=mlp1_depth,
@@ -139,10 +122,10 @@ class S2V(SummationMPNN):
             mlp2_hidden_dim=mlp2_hidden_dim,
             mlp2_depth=mlp2_depth,
             mlp2_dropout_p=mlp2_dropout_p,
-            f_add_elems=len_f_add_per_node,
-            f_conn_elems=len_f_conn_per_node,
+            f_add_elems=self.len_f_add_per_node,
+            f_conn_elems=self.len_f_conn_per_node,
             f_term_elems=1,
-            max_n_nodes=max_n_nodes,
+            max_n_nodes=self.max_n_nodes,
         )
 
     def message_terms(
@@ -172,62 +155,49 @@ class AttentionS2V(AggregationMPNN):
     The "set2vec with attention" model.
     """
 
-    def __init__(
-        self,
-        hidden_node_features: int,
-        n_node_features: int,
-        n_edge_features: int,
-        message_size: int,
-        enn_hidden_dim: int,
-        enn_depth: int,
-        enn_dropout_p: float,
-        att_hidden_dim: int,
-        att_depth: int,
-        att_dropout_p: float,
-        s2v_lstm_computations: int,
-        s2v_memory_size: int,
-        mlp1_hidden_dim: int,
-        mlp1_depth: int,
-        mlp1_dropout_p: float,
-        mlp2_hidden_dim: int,
-        mlp2_depth: int,
-        mlp2_dropout_p: float,
-        len_f_add_per_node: int,
-        len_f_conn_per_node: int,
-        max_n_nodes: int,
-        big_negative: float,
-    ) -> None:
-
+    def __init__(self) -> None:
         super(AttentionS2V, self).__init__()
 
-        self.hidden_node_features = hidden_node_features
-        self.message_size = message_size
-        self.big_negative = big_negative
+        att_hidden_dim = self.params.get("att_hidden_dim", 250)
+        att_depth = self.params.get("att_depth", 4)
+        att_dropout_p = self.params.get("att_dropout_p", 0.0)
+        enn_hidden_dim = self.params.get("enn_hidden_dim", 250)
+        enn_depth = self.params.get("enn_depth", 4)
+        enn_dropout_p = self.params.get("enn_dropout_p", 0.0)
+        mlp1_hidden_dim = self.params.get("mlp1_hidden_dim", 500)
+        mlp1_depth = self.params.get("mlp1_depth", 4)
+        mlp1_dropout_p = self.params.get("mlp1_dropout_p", 0.0)
+        mlp2_hidden_dim = self.params.get("mlp2_hidden_dim", 500)
+        mlp2_depth = self.params.get("mlp2_depth", 4)
+        mlp2_dropout_p = self.params.get("mlp2_dropout_p", 0.0)
+        s2v_memory_size = self.params.get("s2v_memory_size", 100)
+        s2v_lstm_computations = self.params.get("s2v_lstm_computations", 3)
+
         self.enn = MLP(
-            in_features=n_edge_features,
+            in_features=self.edge_features,
             hidden_layer_sizes=[enn_hidden_dim] * enn_depth,
-            out_features=hidden_node_features * message_size,
+            out_features=self.hidden_node_features * self.message_size,
             dropout_p=enn_dropout_p,
         )
         self.att_enn = MLP(
-            in_features=hidden_node_features + n_edge_features,
+            in_features=self.hidden_node_features + self.edge_features,
             hidden_layer_sizes=[att_hidden_dim] * att_depth,
-            out_features=message_size,
+            out_features=self.message_size,
             dropout_p=att_dropout_p,
         )
         self.gru = nn.GRUCell(
-            input_size=message_size,
-            hidden_size=hidden_node_features,
+            input_size=self.message_size,
+            hidden_size=self.hidden_node_features,
             bias=True,
         )
         self.s2v = Set2Vec(
-            node_features=n_node_features,
-            hidden_node_features=hidden_node_features,
+            node_features=self.node_features,
+            hidden_node_features=self.hidden_node_features,
             lstm_computations=s2v_lstm_computations,
             memory_size=s2v_memory_size,
         )
         self.APDReadout = GlobalReadout(
-            node_emb_size=hidden_node_features,
+            node_emb_size=self.hidden_node_features,
             graph_emb_size=s2v_memory_size * 2,
             mlp1_hidden_dim=mlp1_hidden_dim,
             mlp1_depth=mlp1_depth,
@@ -235,10 +205,10 @@ class AttentionS2V(AggregationMPNN):
             mlp2_hidden_dim=mlp2_hidden_dim,
             mlp2_depth=mlp2_depth,
             mlp2_dropout_p=mlp2_dropout_p,
-            f_add_elems=len_f_add_per_node,
-            f_conn_elems=len_f_conn_per_node,
+            f_add_elems=self.len_f_add_per_node,
+            f_conn_elems=self.len_f_conn_per_node,
             f_term_elems=1,
-            max_n_nodes=max_n_nodes,
+            max_n_nodes=self.max_n_nodes,
         )
 
     def aggregate_message(
@@ -285,54 +255,44 @@ class GGNN(SummationMPNN):
     The "gated-graph neural network" model.
     """
 
-    def __init__(
-        self,
-        hidden_node_features: int,
-        n_node_features: int,
-        n_edge_features: int,
-        message_size: int,
-        enn_hidden_dim: int,
-        enn_depth: int,
-        enn_dropout_p: float,
-        gather_width: int,
-        gather_att_hidden_dim: int,
-        gather_att_depth: int,
-        gather_att_dropout_p: float,
-        gather_emb_hidden_dim: int,
-        gather_emb_depth: int,
-        gather_emb_dropout_p: float,
-        mlp1_hidden_dim: int,
-        mlp1_depth: int,
-        mlp1_dropout_p: float,
-        mlp2_hidden_dim: int,
-        mlp2_depth: int,
-        mlp2_dropout_p: float,
-        len_f_add_per_node: int,
-        len_f_conn_per_node: int,
-        max_n_nodes: int,
-        big_positive: float,
-    ) -> None:
+    def __init__(self) -> None:
         super(GGNN, self).__init__()
 
-        self.n_edge_features = n_edge_features
+        enn_hidden_dim = self.params.get("enn_hidden_dim", 250)
+        enn_depth = self.params.get("enn_depth", 4)
+        enn_dropout_p = self.params.get("enn_dropout_p", 0.0)
+        gather_width = self.params.get("gather_width", 100)
+        gather_att_hidden_dim = self.params.get("gather_att_hidden_dim", 250)
+        gather_att_depth = self.params.get("gather_att_depth", 4)
+        gather_att_dropout_p = self.params.get("gather_att_dropout_p", 0.0)
+        gather_emb_hidden_dim = self.params.get("gather_emb_hidden_dim", 250)
+        gather_emb_depth = self.params.get("gather_emb_depth", 4)
+        gather_emb_dropout_p = self.params.get("gather_emb_dropout_p", 0.0)
+        mlp1_hidden_dim = self.params.get("mlp1_hidden_dim", 500)
+        mlp1_depth = self.params.get("mlp1_depth", 4)
+        mlp1_dropout_p = self.params.get("mlp1_dropout_p", 0.0)
+        mlp2_hidden_dim = self.params.get("mlp2_hidden_dim", 500)
+        mlp2_depth = self.params.get("mlp2_depth", 4)
+        mlp2_dropout_p = self.params.get("mlp2_dropout_p", 0.0)
+
         self.msg_nns = nn.ModuleList()
-        for _ in range(n_edge_features):
+        for _ in range(self.edge_features):
             self.msg_nns.append(
                 MLP(
-                    in_features=hidden_node_features,
+                    in_features=self.hidden_node_features,
                     hidden_layer_sizes=[enn_hidden_dim] * enn_depth,
-                    out_features=message_size,
+                    out_features=self.message_size,
                     dropout_p=enn_dropout_p,
                 )
             )
         self.gru = nn.GRUCell(
-            input_size=message_size,
-            hidden_size=hidden_node_features,
+            input_size=self.message_size,
+            hidden_size=self.hidden_node_features,
             bias=True,
         )
         self.gather = GraphGather(
-            node_features=n_node_features,
-            hidden_node_features=hidden_node_features,
+            node_features=self.node_features,
+            hidden_node_features=self.hidden_node_features,
             out_features=gather_width,
             att_depth=gather_att_depth,
             att_hidden_dim=gather_att_hidden_dim,
@@ -340,10 +300,10 @@ class GGNN(SummationMPNN):
             emb_depth=gather_emb_depth,
             emb_hidden_dim=gather_emb_hidden_dim,
             emb_dropout_p=gather_emb_dropout_p,
-            big_positive=big_positive,
+            big_positive=self.big_positive,
         )
         self.APDReadout = GlobalReadout(
-            node_emb_size=hidden_node_features,
+            node_emb_size=self.hidden_node_features,
             graph_emb_size=gather_width,
             mlp1_hidden_dim=mlp1_hidden_dim,
             mlp1_depth=mlp1_depth,
@@ -351,22 +311,22 @@ class GGNN(SummationMPNN):
             mlp2_hidden_dim=mlp2_hidden_dim,
             mlp2_depth=mlp2_depth,
             mlp2_dropout_p=mlp2_dropout_p,
-            f_add_elems=len_f_add_per_node,
-            f_conn_elems=len_f_conn_per_node,
+            f_add_elems=self.len_f_add_per_node,
+            f_conn_elems=self.len_f_conn_per_node,
             f_term_elems=1,
-            max_n_nodes=max_n_nodes,
+            max_n_nodes=self.max_n_nodes,
         )
 
     def message_terms(
         self, nodes: th.Tensor, node_neighbours: th.Tensor, edges: th.Tensor
     ) -> th.Tensor:
-        edges_v = edges.view(-1, self.n_edge_features, 1)
+        edges_v = edges.view(-1, self.edge_features, 1)
         node_neighbours_v = edges_v * node_neighbours.view(
-            -1, 1, self.constants.hidden_node_features
+            -1, 1, self.hidden_node_features
         )
         terms_masked_per_edge = [
             edges_v[:, i, :] * self.msg_nns[i](node_neighbours_v[:, i, :])
-            for i in range(self.n_edge_features)
+            for i in range(self.edge_features)
         ]
         return sum(terms_masked_per_edge)
 
@@ -389,68 +349,57 @@ class AttentionGGNN(AggregationMPNN):
     The "GGNN with attention" model.
     """
 
-    def __init__(
-        self,
-        hidden_node_features: int,
-        n_node_features: int,
-        n_edge_features: int,
-        message_size: int,
-        msg_hidden_dim: int,
-        msg_depth: int,
-        msg_dropout_p: float,
-        att_hidden_dim: int,
-        att_depth: int,
-        att_dropout_p: float,
-        gather_width: int,
-        gather_att_hidden_dim: int,
-        gather_att_depth: int,
-        gather_att_dropout_p: float,
-        gather_emb_hidden_dim: int,
-        gather_emb_depth: int,
-        gather_emb_dropout_p: float,
-        mlp1_hidden_dim: int,
-        mlp1_depth: int,
-        mlp1_dropout_p: float,
-        mlp2_hidden_dim: int,
-        mlp2_depth: int,
-        mlp2_dropout_p: float,
-        len_f_add_per_node: int,
-        len_f_conn_per_node: int,
-        max_n_nodes: int,
-        big_positive: float,
-    ) -> None:
+    def __init__(self) -> None:
         super(AttentionGGNN, self).__init__()
 
-        self.big_positive = big_positive
-        self.n_edge_features = n_edge_features
+        msg_hidden_dim = self.params.get("msg_hidden_dim", 250)
+        msg_depth = self.params.get("msg_depth", 4)
+        msg_dropout_p = self.params.get("msg_dropout_p", 0.0)
+        att_hidden_dim = self.params.get("att_hidden_dim", 250)
+        att_depth = self.params.get("att_depth", 4)
+        att_dropout_p = self.params.get("att_dropout_p", 0.0)
+        gather_width = self.params.get("gather_width", 100)
+        gather_att_hidden_dim =self.params.get("gather_att_hidden_dim", 250)
+        gather_att_depth = self.params.get("gather_att_depth", 4)
+        gather_att_dropout_p = self.params.get("gather_att_dropout_p", 0.0)
+        gather_emb_hidden_dim =self.params.get("gather_emb_hidden_dim", 250)
+        gather_emb_depth = self.params.get("gather_emb_depth", 4)
+        gather_emb_dropout_p = self.params.get("gather_emb_dropout_p", 0.0)
+        mlp1_hidden_dim = self.params.get("mlp1_hidden_dim", 500)
+        mlp1_depth = self.params.get("mlp1_depth", 4)
+        mlp1_dropout_p = self.params.get("mlp1_dropout_p", 0.0)
+        mlp2_hidden_dim = self.params.get("mlp2_hidden_dim", 500)
+        mlp2_depth = self.params.get("mlp2_depth", 4)
+        mlp2_dropout_p = self.params.get("mlp2_dropout_p", 0.0)
+
         self.msg_nns = nn.ModuleList()
         self.att_nns = nn.ModuleList()
 
-        for _ in range(n_edge_features):
+        for _ in range(self.edge_features):
             self.msg_nns.append(
                 MLP(
-                    in_features=hidden_node_features,
+                    in_features=self.hidden_node_features,
                     hidden_layer_sizes=[msg_hidden_dim] * msg_depth,
-                    out_features=message_size,
+                    out_features=self.message_size,
                     dropout_p=msg_dropout_p,
                 )
             )
             self.att_nns.append(
                 MLP(
-                    in_features=hidden_node_features,
+                    in_features=self.hidden_node_features,
                     hidden_layer_sizes=[att_hidden_dim] * att_depth,
-                    out_features=message_size,
+                    out_features=self.message_size,
                     dropout_p=att_dropout_p,
                 )
             )
         self.gru = nn.GRUCell(
-            input_size=message_size,
-            hidden_size=hidden_node_features,
+            input_size=self.message_size,
+            hidden_size=self.hidden_node_features,
             bias=True,
         )
         self.gather = GraphGather(
-            node_features=n_node_features,
-            hidden_node_features=hidden_node_features,
+            node_features=self.node_features,
+            hidden_node_features=self.hidden_node_features,
             out_features=gather_width,
             att_depth=gather_att_depth,
             att_hidden_dim=gather_att_hidden_dim,
@@ -458,10 +407,10 @@ class AttentionGGNN(AggregationMPNN):
             emb_depth=gather_emb_depth,
             emb_hidden_dim=gather_emb_hidden_dim,
             emb_dropout_p=gather_emb_dropout_p,
-            big_positive=big_positive,
+            big_positive=self.big_positive,
         )
         self.APDReadout = GlobalReadout(
-            node_emb_size=hidden_node_features,
+            node_emb_size=self.hidden_node_features,
             graph_emb_size=gather_width,
             mlp1_hidden_dim=mlp1_hidden_dim,
             mlp1_depth=mlp1_depth,
@@ -469,10 +418,10 @@ class AttentionGGNN(AggregationMPNN):
             mlp2_hidden_dim=mlp2_hidden_dim,
             mlp2_depth=mlp2_depth,
             mlp2_dropout_p=mlp2_dropout_p,
-            f_add_elems=len_f_add_per_node,
-            f_conn_elems=len_f_conn_per_node,
+            f_add_elems=self.len_f_add_per_node,
+            f_conn_elems=self.len_f_conn_per_node,
             f_term_elems=1,
-            max_n_nodes=max_n_nodes,
+            max_n_nodes=self.max_n_nodes,
         )
 
     def aggregate_message(
@@ -517,67 +466,58 @@ class EMN(EdgeMPNN):
     The "edge memory network" model.
     """
 
-    def __init__(
-        self,
-        n_node_features: int,
-        n_edge_features: int,
-        edge_emb_size: int,
-        edge_emb_hidden_dim: int,
-        edge_emb_depth: int,
-        edge_emb_dropout_p: float,
-        msg_hidden_dim: int,
-        msg_depth: int,
-        msg_dropout_p: float,
-        att_hidden_dim: int,
-        att_depth: int,
-        att_dropout_p: float,
-        gather_width: int,
-        gather_att_hidden_dim: int,
-        gather_att_depth: int,
-        gather_att_dropout_p: float,
-        gather_emb_hidden_dim: int,
-        gather_emb_depth: int,
-        gather_emb_dropout_p: float,
-        mlp1_hidden_dim: int,
-        mlp1_depth: int,
-        mlp1_dropout_p: float,
-        mlp2_hidden_dim: int,
-        mlp2_depth: int,
-        mlp2_dropout_p: float,
-        len_f_add_per_node: int,
-        len_f_conn_per_node: int,
-        max_n_nodes: int,
-        big_positive: float,
-    ) -> None:
+    def __init__(self) -> None:
         super(EMN, self).__init__()
 
-        self.big_positive = big_positive
+        edge_emb_hidden_dim = self.params.get("edge_emb_hidden_dim", 250)
+        edge_emb_depth = self.params.get("edge_emb_depth", 4)
+        edge_emb_dropout_p = self.params.get("edge_emb_dropout_p", 0.0)
+        msg_hidden_dim = self.params.get("msg_hidden_dim", 250)
+        msg_depth = self.params.get("msg_depth", 4)
+        msg_dropout_p = self.params.get("msg_dropout_p", 0.0)
+        att_hidden_dim = self.params.get("att_hidden_dim", 250)
+        att_depth = self.params.get("att_depth", 4)
+        att_dropout_p = self.params.get("att_dropout_p", 0.0)
+        gather_width = self.params.get("gather_width", 100)
+        gather_att_hidden_dim = self.params.get("gather_att_hidden_dim", 250)
+        gather_att_depth = self.params.get("gather_att_depth", 4)
+        gather_att_dropout_p = self.params.get("gather_att_dropout_p", 0.0)
+        gather_emb_hidden_dim = self.params.get("gather_emb_hidden_dim", 250)
+        gather_emb_depth = self.params.get("gather_emb_depth", 4)
+        gather_emb_dropout_p = self.params.get("gather_emb_dropout_p", 0.0)
+        mlp1_hidden_dim = self.params.get("mlp1_hidden_dim", 500)
+        mlp1_depth = self.params.get("mlp1_depth", 4)
+        mlp1_dropout_p = self.params.get("mlp1_dropout_p", 0.0)
+        mlp2_hidden_dim = self.params.get("mlp2_hidden_dim", 500)
+        mlp2_depth = self.params.get("mlp2_depth", 4)
+        mlp2_dropout_p = self.params.get("mlp2_dropout_p", 0.0)
+
         self.embedding_nn = MLP(
-            in_features=n_node_features * 2 + n_edge_features,
+            in_features=self.node_features * 2 + self.edge_features,
             hidden_layer_sizes=[edge_emb_hidden_dim] * edge_emb_depth,
-            out_features=edge_emb_size,
+            out_features=self.edge_emb_size,
             dropout_p=edge_emb_dropout_p,
         )
         self.emb_msg_nn = MLP(
-            in_features=edge_emb_size,
+            in_features=self.edge_emb_size,
             hidden_layer_sizes=[msg_hidden_dim] * msg_depth,
-            out_features=edge_emb_size,
+            out_features=self.edge_emb_size,
             dropout_p=msg_dropout_p,
         )
         self.att_msg_nn = MLP(
-            in_features=edge_emb_size,
+            in_features=self.edge_emb_size,
             hidden_layer_sizes=[att_hidden_dim] * att_depth,
-            out_features=edge_emb_size,
+            out_features=self.edge_emb_size,
             dropout_p=att_dropout_p,
         )
         self.gru = nn.GRUCell(
-            input_size=edge_emb_size,
-            hidden_size=edge_emb_size,
+            input_size=self.edge_emb_size,
+            hidden_size=self.edge_emb_size,
             bias=True,
         )
         self.gather = GraphGather(
-            node_features=edge_emb_size,
-            hidden_node_features=edge_emb_size,
+            node_features=self.edge_emb_size,
+            hidden_node_features=self.edge_emb_size,
             out_features=gather_width,
             att_depth=gather_att_depth,
             att_hidden_dim=gather_att_hidden_dim,
@@ -585,10 +525,10 @@ class EMN(EdgeMPNN):
             emb_depth=gather_emb_depth,
             emb_hidden_dim=gather_emb_hidden_dim,
             emb_dropout_p=gather_emb_dropout_p,
-            big_positive=big_positive,
+            big_positive=self.big_positive,
         )
         self.APDReadout = GlobalReadout(
-            node_emb_size=edge_emb_size,
+            node_emb_size=self.edge_emb_size,
             graph_emb_size=gather_width,
             mlp1_hidden_dim=mlp1_hidden_dim,
             mlp1_depth=mlp1_depth,
@@ -596,10 +536,10 @@ class EMN(EdgeMPNN):
             mlp2_hidden_dim=mlp2_hidden_dim,
             mlp2_depth=mlp2_depth,
             mlp2_dropout_p=mlp2_dropout_p,
-            f_add_elems=len_f_add_per_node,
-            f_conn_elems=len_f_conn_per_node,
+            f_add_elems=self.len_f_add_per_node,
+            f_conn_elems=self.len_f_conn_per_node,
             f_term_elems=1,
-            max_n_nodes=max_n_nodes,
+            max_n_nodes=self.max_n_nodes,
         )
 
     def preprocess_edges(
