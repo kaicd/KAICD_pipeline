@@ -163,7 +163,6 @@ def plot_and_compare_proteins(
     plt.clf()
 
 
-
 def plot_loss(loss, reward, epoch, cell_line, save_path, rolling=1, site="unknown"):
     loss = pd.Series(loss).rolling(rolling).mean()
     rewards = pd.Series(reward).rolling(rolling).mean()
@@ -240,7 +239,11 @@ def load_ts_properties(csv_path: str) -> dict:
 
 
 def properties_to_csv(
-    params: dict, prop_dict: dict, csv_filename: str, epoch_key: str, append: bool = True
+    params: dict,
+    prop_dict: dict,
+    csv_filename: str,
+    epoch_key: str,
+    append: bool = True,
 ) -> None:
     """
     Writes a CSV summarizing how training is going by comparing the properties of the

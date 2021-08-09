@@ -308,9 +308,7 @@ class ContextAttentionLayer(nn.Module):
         context_attention = self.context_hidden_projection(
             self.context_projection(context).permute(0, 2, 1)
         ).permute(0, 2, 1)
-        alphas = self.alpha_projection(
-            th.tanh(reference_attention + context_attention)
-        )
+        alphas = self.alpha_projection(th.tanh(reference_attention + context_attention))
         output = th.sum(reference * th.unsqueeze(alphas, -1), 1)
 
         return output, alphas
@@ -472,19 +470,13 @@ class Set2Vec(nn.Module):
         batch_size = input_nodes.shape[0]
         energy_mask = th.bitwise_not(node_mask).float() * self.C.big_negative
 
-        lstm_input = th.zeros(
-            batch_size, self.memory_size
-        )
+        lstm_input = th.zeros(batch_size, self.memory_size)
 
         cat = th.cat((hidden_output_nodes, input_nodes), dim=2)
         memory = self.embedding_matrix(cat)
 
-        hidden_state = th.zeros(
-            batch_size, self.memory_size
-        )
-        cell_state = th.zeros(
-            batch_size, self.memory_size
-        )
+        hidden_state = th.zeros(batch_size, self.memory_size)
+        cell_state = th.zeros(batch_size, self.memory_size)
 
         for _ in range(self.lstm_computations):
             query, cell_state = self.lstm(lstm_input, (hidden_state, cell_state))
@@ -558,9 +550,7 @@ class MLP(nn.Module):
         # bias must be used in most MLPs in our models to learn from empty graphs
         linear = nn.Linear(in_f, out_f, bias=True)
         nn.init.xavier_uniform_(linear.weight)
-        return nn.Sequential(
-            linear, activation(), nn.AlphaDropout(dropout_p)
-        )
+        return nn.Sequential(linear, activation(), nn.AlphaDropout(dropout_p))
 
     def forward(self, layers_input: nn.Sequential) -> nn.Sequential:
         """
@@ -670,8 +660,6 @@ class GlobalReadout(nn.Module):
         f_term_2 = self.fTermNet2(graph_embedding_batch)
 
         # flatten and concatenate
-        cat = th.cat(
-            (f_add_2.squeeze(dim=1), f_conn_2.squeeze(dim=1), f_term_2), dim=1
-        )
+        cat = th.cat((f_add_2.squeeze(dim=1), f_conn_2.squeeze(dim=1), f_term_2), dim=1)
 
         return cat  # note: no activation function before returning

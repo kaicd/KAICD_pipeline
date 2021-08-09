@@ -162,7 +162,9 @@ class ChemGG_Analyzer:
             merged_properties = {**prop_dict, **ts_properties}
 
             # plot properties for this epoch
-            plot_filename = f"{self.save_filepath}generation/features{epoch_key[6:]}.png"
+            plot_filename = (
+                f"{self.save_filepath}generation/features{epoch_key[6:]}.png"
+            )
             self.plot_molecular_properties(
                 properties=merged_properties, plot_filename=plot_filename
             )
@@ -615,7 +617,10 @@ class ChemGG_Analyzer:
                 likelihood[~th.isnan(likelihood)]
             )  # remove NaN values; ~ inverts a boolean tensor
             nlls[
-                idx * self.params["batch_size"] : (idx * self.params["batch_size"] + len(nll))
+                idx
+                * self.params["batch_size"] : (
+                    idx * self.params["batch_size"] + len(nll)
+                )
             ] = nll
 
             # in computing the number of structures, important to use `target_output` and not
@@ -672,9 +677,7 @@ class ChemGG_Analyzer:
                 norm_n_edges_hist,
                 norm_edge_feature_hist,
                 norm_chirality_hist,
-            ) = normalize_evaluation_metrics(
-                prop_dict=properties, epoch_key=epoch_key
-            )
+            ) = normalize_evaluation_metrics(prop_dict=properties, epoch_key=epoch_key)
 
             # plot num nodes histogram
             ax_nn.plot(
@@ -701,7 +704,10 @@ class ChemGG_Analyzer:
 
             # plot formal charge histogram
             ax_fc.plot(
-                range(self.params["formal_charge"][0], self.params["formal_charge"][-1] + 1),
+                range(
+                    self.params["formal_charge"][0],
+                    self.params["formal_charge"][-1] + 1,
+                ),
                 norm_formal_charge_hist,
                 color=c,
                 label=epoch_key,

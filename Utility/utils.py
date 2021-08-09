@@ -59,9 +59,7 @@ def sequential_data_preparation(
     # apply token dropout if keep != 1
     if input_keep != 1:
         # build dropout indices consisting of dropout_index
-        dropout_indices = th.LongTensor(
-            dropout_index * th.ones(1, batch_size).numpy()
-        )
+        dropout_indices = th.LongTensor(dropout_index * th.ones(1, batch_size).numpy())
         # mask for token dropout
         mask = Bernoulli(input_keep).sample((input_batch.shape[0],))
         mask = th.LongTensor(mask.numpy())
@@ -125,9 +123,7 @@ def packed_sequential_data_preparation(
             decoder[dropout_loc] = dropout_index
 
         # just .clone() propagates to graph
-        target = th.cat(
-            [input[1:].detach().clone(), th.Tensor([0]).long().to(device)]
-        )
+        target = th.cat([input[1:].detach().clone(), th.Tensor([0]).long().to(device)])
         return input, decoder, target.to(device)
 
     batch = [_process_sample(sample) for sample in input_batch]
@@ -485,7 +481,7 @@ def get_log_molar(y, ic50_max=None, ic50_min=None):
 
 def get_feature_dimensions(params: dict):
     """
-       Returns dimensions of all node features.
+    Returns dimensions of all node features.
     """
     n_atom_types = len(params["atom_types"])
     n_formal_charge = len(params["formal_charge"])
@@ -679,7 +675,9 @@ def one_of_k_encoding(x: Union[str, int], allowable_set: list) -> "generator":
 def update_features(params):
     update_params = params
     # define node features
-    n_atom_types, n_formal_charge, n_imp_H, n_chirality = get_feature_dimensions(update_params)
+    n_atom_types, n_formal_charge, n_imp_H, n_chirality = get_feature_dimensions(
+        update_params
+    )
     node_features = n_atom_types + n_formal_charge + n_imp_H + n_chirality
     # define edge features
     bondtype_to_int = {BondType.SINGLE: 0, BondType.DOUBLE: 1, BondType.TRIPLE: 2}

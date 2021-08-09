@@ -2,6 +2,7 @@
 import math
 import torch as th
 import torch.nn as nn
+
 # load GraphINVENT-specific functions
 from Utility.mpnns import AggregationMPNN, SummationMPNN, EdgeMPNN
 from Utility.layers import GraphGather, Set2Vec, MLP, GlobalReadout
@@ -359,10 +360,10 @@ class AttentionGGNN(AggregationMPNN):
         att_depth = self.params.get("att_depth", 4)
         att_dropout_p = self.params.get("att_dropout_p", 0.0)
         gather_width = self.params.get("gather_width", 100)
-        gather_att_hidden_dim =self.params.get("gather_att_hidden_dim", 250)
+        gather_att_hidden_dim = self.params.get("gather_att_hidden_dim", 250)
         gather_att_depth = self.params.get("gather_att_depth", 4)
         gather_att_dropout_p = self.params.get("gather_att_dropout_p", 0.0)
-        gather_emb_hidden_dim =self.params.get("gather_emb_hidden_dim", 250)
+        gather_emb_hidden_dim = self.params.get("gather_emb_hidden_dim", 250)
         gather_emb_depth = self.params.get("gather_emb_depth", 4)
         gather_emb_dropout_p = self.params.get("gather_emb_dropout_p", 0.0)
         mlp1_hidden_dim = self.params.get("mlp1_hidden_dim", 500)

@@ -34,7 +34,7 @@ class MolecularGraph:
 
     def __init__(
         self,
-        constants: namedtuple,
+        params: namedtuple,
         molecule: rdkit.Chem.Mol,
         node_features: Union[np.ndarray, th.Tensor],
         edge_features: Union[np.ndarray, th.Tensor],
@@ -43,11 +43,11 @@ class MolecularGraph:
         """
         Args:
         ----
-            constants (namedtuple) : Contains job parameters as well as global constants.
+            params (namedtuple) : Contains job parameters as well as global params.
             molecule (rdkit.Chem.Mol) : Input used for creating `PreprocessingGraph`.
             atom_feature_vector (th.Tensor) : Input used for creating `TrainingGraph`.
         """
-        self.constants = constants
+        self.params = params
 
         # placeholders
         self.molecule = None
@@ -116,7 +116,7 @@ class MolecularGraph:
             node_to_idx[v] = molecule_idx
 
         # add bonds between adjacent atoms
-        for bond_type in range(self.constants.n_edge_features):
+        for bond_type in range(self.params["edge_features"]):
             # `self.edge_features[:, :, bond_type]` is an adjacency matrix
             #  for that specific `bond_type`
             for bond_idx1, row in enumerate(
@@ -130,7 +130,7 @@ class MolecularGraph:
                             molecule.AddBond(
                                 node_to_idx[bond_idx1],
                                 node_to_idx[bond_idx2],
-                                self.constants.int_to_bondtype[bond_type],
+                                self.params["int_to_bondtype"][bond_type],
                             )
                         except (TypeError, RuntimeError, AttributeError):
                             # errors occur if the above `AddBond()` action tries to add multiple
@@ -147,7 +147,7 @@ class MolecularGraph:
 
         # if `ignore_H` flag is used, "sanitize" the structure to correct
         # the number of implicit hydrogens (otherwise, they will all stay at 0)
-        if self.constants.ignore_H and molecule:
+        if self.params["ignore_H"] and molecule:
             try:
                 rdkit.Chem.SanitizeMol(molecule)
             except ValueError:
@@ -184,44 +184,44 @@ class MolecularGraph:
 
         # determine atom symbol
         atom_idx = nonzero_idc[0]
-        atom_type = self.constants.atom_types[atom_idx]
+        atom_type = self.params["atom_types"][atom_idx]
 
         # initialize atom using atom symbol
         new_atom = rdkit.Chem.Atom(atom_type)
 
         # determine formal charge
-        fc_idx = nonzero_idc[1] - self.constants.n_atom_types
-        formal_charge = self.constants.formal_charge[fc_idx]
+        fc_idx = nonzero_idc[1] - self.params["n_atom_types"]
+        formal_charge = self.params["formal_charge"][fc_idx]
 
         new_atom.SetFormalCharge(formal_charge)
 
         # determine number of implicit Hs
-        if not self.constants.use_explicit_H and not self.constants.ignore_H:
+        if not self.params["use_explicit_H"] and not self.params["ignore_H"]:
             total_num_h_idx = (
                 nonzero_idc[2]
-                - self.constants.n_atom_types
-                - self.constants.n_formal_charge
+                - self.params["n_atom_types"]
+                - self.params["n_formal_charge"]
             )
-            total_num_h = self.constants.imp_H[total_num_h_idx]
+            total_num_h = self.params["imp_H"][total_num_h_idx]
 
             new_atom.SetUnsignedProp("_TotalNumHs", total_num_h)
 
-        elif self.constants.ignore_H:
+        elif self.params["ignore_H"]:
             # Hs will be set with structure is sanitized later
             pass
 
         # determine chirality
-        if self.constants.use_chirality:
+        if self.params["use_chirality"]:
             cip_code_idx = (
                 nonzero_idc[-1]
-                - self.constants.n_atom_types
-                - self.constants.n_formal_charge
+                - self.params["n_atom_types"]
+                - self.params["n_formal_charge"]
                 - bool(
-                    not self.constants.use_explicit_H and not self.constants.ignore_H
+                not self.params["use_explicit_H"] and not self.params["ignore_H"]
                 )
-                * self.constants.n_imp_H
+                * self.params["n_imp_H"]
             )
-            cip_code = self.constants.chirality[cip_code_idx]
+            cip_code = self.params["chirality"][cip_code_idx]
             new_atom.SetProp("_CIPCode", cip_code)
 
         return new_atom
@@ -239,15 +239,14 @@ class MolecularGraph:
 
         # build the edge features tensor using a Numpy array
         edge_features = np.zeros(
-            [n_atoms, n_atoms, self.constants.n_edge_features], dtype=np.int32
+            [n_atoms, n_atoms, self.params["edge_features"]], dtype=np.int32
         )
         for bond in molecule.GetBonds():
             i = bond.GetBeginAtomIdx()
             j = bond.GetEndAtomIdx()
-            bond_type = self.constants.bondtype_to_int[bond.GetBondType()]
+            bond_type = self.params["bondtype_to_int"][bond.GetBondType()]
             edge_features[i, j, bond_type] = 1
             edge_features[j, i, bond_type] = 1
-
         # define the number of nodes
         self.n_nodes = n_atoms
 
@@ -262,9 +261,9 @@ class PreprocessingGraph(MolecularGraph):
     datasets. These are never loaded onto the GPU.
     """
 
-    def __init__(self, constants: namedtuple, molecule: rdkit.Chem.Mol) -> None:
+    def __init__(self, params: namedtuple, molecule: rdkit.Chem.Mol) -> None:
         super().__init__(
-            constants,
+            params,
             molecule=False,
             node_features=False,
             edge_features=False,
@@ -274,7 +273,7 @@ class PreprocessingGraph(MolecularGraph):
         # define values previously set to `None` or undefined
         self.node_ordering = None  # to be defined in `self.node_remap()`
 
-        if self.constants.use_explicit_H and not self.constants.ignore_H:
+        if self.params["use_explicit_H"] and not self.params["ignore_H"]:
             molecule = rdkit.Chem.AddHs(molecule)
 
         self.n_nodes = molecule.GetNumAtoms()
@@ -285,7 +284,7 @@ class PreprocessingGraph(MolecularGraph):
         # remap the nodes using either a canonical or random node ordering
         self.node_remap(molecule=molecule)
 
-        # pad up to size of largest graph in dataset (`self.constants.max_n_nodes`)
+        # pad up to size of largest graph in dataset (`self.params["max_n_nodes"]`)
         self.pad_graph_representation()
 
     def atom_features(self, atom: rdkit.Chem.Atom) -> np.ndarray:
@@ -303,25 +302,23 @@ class PreprocessingGraph(MolecularGraph):
             feature_vector (numpy.ndarray) : Corresponding feature vector.
         """
         feature_vector_generator = itertools.chain(
-            one_of_k_encoding(atom.GetSymbol(), self.constants.atom_types),
-            one_of_k_encoding(
-                atom.GetFormalCharge(), self.constants.formal_charge
-            ),
+            one_of_k_encoding(atom.GetSymbol(), self.params["atom_types"]),
+            one_of_k_encoding(atom.GetFormalCharge(), self.params["formal_charge"]),
         )
-        if not self.constants.use_explicit_H and not self.constants.ignore_H:
+        if not self.params["use_explicit_H"] and not self.params["ignore_H"]:
             feature_vector_generator = itertools.chain(
                 feature_vector_generator,
-                one_of_k_encoding(atom.GetTotalNumHs(), self.constants.imp_H),
+                one_of_k_encoding(atom.GetTotalNumHs(), self.params["imp_H"]),
             )
-        if self.constants.use_chirality:
+        if self.params["use_chirality"]:
             try:
                 chiral_state = atom.GetProp("_CIPCode")
             except KeyError:
-                chiral_state = self.constants.chirality[0]  # "None"
+                chiral_state = self.params["chirality"][0]  # "None"
 
             feature_vector_generator = itertools.chain(
                 feature_vector_generator,
-                one_of_k_encoding(chiral_state, self.constants.chirality),
+                one_of_k_encoding(chiral_state, self.params["chirality"]),
             )
 
         feature_vector = np.fromiter(feature_vector_generator, int)
@@ -354,7 +351,7 @@ class PreprocessingGraph(MolecularGraph):
 
             for node in last_nodes_visited:
                 neighbor_nodes = []
-                for bond_type in range(self.constants.n_edge_features):
+                for bond_type in range(self.params["edge_features"]):
                     neighbor_nodes.extend(
                         list(np.nonzero(self.edge_features[node, :, bond_type])[0])
                     )
@@ -403,7 +400,7 @@ class PreprocessingGraph(MolecularGraph):
         while len(nodes_visited) < self.n_nodes:
 
             neighbor_nodes = []
-            for bond_type in range(self.constants.n_edge_features):
+            for bond_type in range(self.params["edge_features"]):
                 neighbor_nodes.extend(
                     list(
                         np.nonzero(self.edge_features[last_node_visited, :, bond_type])[
@@ -441,7 +438,7 @@ class PreprocessingGraph(MolecularGraph):
         Remaps nodes in `rdkit.Chem.Mol` object (`molecule`) either randomly, or using RDKit's
         canonical node ordering. This depends on if `use_canon` is specified or not.
         """
-        if not self.constants.use_canon:
+        if not self.params["use_canon"]:
             # get a *random* node ranking
             atom_ranking = list(range(self.n_nodes))
             random.shuffle(atom_ranking)
@@ -451,11 +448,11 @@ class PreprocessingGraph(MolecularGraph):
 
         # using a random node as a starting point, get a new node ranking that
         # does not leave isolated fragments in graph traversal
-        if self.constants.decoding_route == "bfs":
+        if self.params["decoding_route"] == "bfs":
             self.node_ordering = self.breadth_first_search(
                 node_ranking=atom_ranking, node_init=atom_ranking[0]
             )
-        elif self.constants.decoding_route == "dfs":
+        elif self.params["decoding_route"] == "dfs":
             self.node_ordering = self.depth_first_search(
                 node_ranking=atom_ranking, node_init=atom_ranking[0]
             )
@@ -493,12 +490,12 @@ class PreprocessingGraph(MolecularGraph):
         fv_nonzero_idc = self.get_nonzero_feature_indices(node_idx=last_node_idx)
 
         # initialize action probability distribution (APD)
-        f_add = np.zeros(self.constants.dim_f_add, dtype=np.int32)
-        f_conn = np.zeros(self.constants.dim_f_conn, dtype=np.int32)
+        f_add = np.zeros(self.params["dim_f_add"], dtype=np.int32)
+        f_conn = np.zeros(self.params["dim_f_conn"], dtype=np.int32)
 
         # determine which nodes are bonded
         bonded_nodes = []
-        for bond_type in range(self.constants.n_edge_features):
+        for bond_type in range(self.params["edge_features"]):
             bonded_nodes.extend(
                 list(np.nonzero(self.edge_features[:, last_node_idx, bond_type])[0])
             )
@@ -541,8 +538,8 @@ class PreprocessingGraph(MolecularGraph):
               of terminating the graph generation.
         """
         # initialize action probability distribution (APD)
-        f_add = np.zeros(self.constants.dim_f_add, dtype=np.int32)
-        f_conn = np.zeros(self.constants.dim_f_conn, dtype=np.int32)
+        f_add = np.zeros(self.params["dim_f_add"], dtype=np.int32)
+        f_conn = np.zeros(self.params["dim_f_conn"], dtype=np.int32)
 
         # concatenate `f_add`, `f_conn`, and `f_term` (`f_term`==0)
         apd = np.concatenate((f_add.ravel(), f_conn.ravel(), np.array([1])))
@@ -610,13 +607,13 @@ class PreprocessingGraph(MolecularGraph):
         """
         # initialize the padded graph representation arrays
         node_features_padded = np.zeros(
-            (self.constants.max_n_nodes, self.constants.n_node_features)
+            (self.params["max_n_nodes"], self.params["node_features"])
         )
         edge_features_padded = np.zeros(
             (
-                self.constants.max_n_nodes,
-                self.constants.max_n_nodes,
-                self.constants.n_edge_features,
+                self.params["max_n_nodes"],
+                self.params["max_n_nodes"],
+                self.params["edge_features"],
             )
         )
 
@@ -645,7 +642,7 @@ class PreprocessingGraph(MolecularGraph):
         else:
             # determine how many bonds on the least important atom
             bond_idc = []
-            for bond_type in range(self.constants.n_edge_features):
+            for bond_type in range(self.params["edge_features"]):
                 bond_idc.extend(
                     list(np.nonzero(self.edge_features[:, last_atom_idx, bond_type])[0])
                 )
@@ -728,11 +725,9 @@ class TrainingGraph(MolecularGraph):
     the graph attributes, so they can be conveniently used on the GPU.
     """
 
-    def __init__(
-        self, constants: namedtuple, atom_feature_vector: th.Tensor
-    ) -> None:
+    def __init__(self, params: namedtuple, atom_feature_vector: th.Tensor) -> None:
         super().__init__(
-            constants,
+            params,
             molecule=False,
             node_features=False,
             edge_features=False,
@@ -745,22 +740,18 @@ class TrainingGraph(MolecularGraph):
         # define graph attributes
         self.node_features = atom_feature_vector.unsqueeze(dim=0)
 
-        self.edge_features = th.Tensor(
-            [[[0] * self.constants.n_edge_features]], device=self.constants.device
-        )
+        self.edge_features = th.Tensor([[[0] * self.params["edge_features"]]])
 
         # initialize the padded graph representation arrays
         node_features_padded = th.zeros(
-            (self.constants.max_n_nodes, self.constants.n_node_features),
-            device=self.constants.device,
+            (self.params["max_n_nodes"], self.params["node_features"])
         )
         edge_features_padded = th.zeros(
             (
-                self.constants.max_n_nodes,
-                self.constants.max_n_nodes,
-                self.constants.n_edge_features,
-            ),
-            device=self.constants.device,
+                self.params["max_n_nodes"],
+                self.params["max_n_nodes"],
+                self.params["edge_features"],
+            )
         )
 
         # pad up to size of largest graph
@@ -789,13 +780,13 @@ class GenerationGraph(MolecularGraph):
 
     def __init__(
         self,
-        constants: namedtuple,
+        params: namedtuple,
         molecule: rdkit.Chem.Mol,
         node_features: th.Tensor,
         edge_features: th.Tensor,
     ) -> None:
         super().__init__(
-            constants,
+            params,
             molecule=False,
             node_features=False,
             edge_features=False,
