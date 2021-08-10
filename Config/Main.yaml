@@ -1,3 +1,3 @@
 wandb:
   entity: "kaicd"
-  project: "KAICD_pipeline_SARS2"
+  project: "KAICD_ChemGG"

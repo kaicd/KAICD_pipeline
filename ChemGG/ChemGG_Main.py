@@ -4,10 +4,10 @@ import argparse
 import pytorch_lightning as pl
 from pytorch_lightning import loggers
 from pytorch_lightning.callbacks import ModelCheckpoint
-from pytoda.smiles.smiles_language import SMILESLanguage
 
-from ChemVAE_Module import ChemVAE_Module
-from ChemVAE_DataModule import ChemVAE_DataModule
+from .ChemGG_Analyzer import ChemGG_Analyzer
+from ChemGG_Module import ChemGG_Module
+from ChemGG_DataModule import ChemGG_DataModule
 
 
 parser = argparse.ArgumentParser()
@@ -23,25 +23,18 @@ parser.add_argument(
 parser.add_argument(
     "--save_filepath",
     type=str,
-    default="ChemVAE/checkpoint/",
+    default="ChemGG/checkpoint/",
 )
 parser.add_argument(
-    "--checkpoint_filepath", type=str, default="ChemVAE/checkpoint/ChemVAE_5M.ckpt"
+    "--checkpoint_filepath", type=str, default=""
 )
-parser.add_argument("--model_name", type=str, default="ChemVAE")
+parser.add_argument("--model_name", type=str, default="MNN")
 parser.add_argument("--seed", type=int, default=42)
 
-# Parameter args
-parser.add_argument(
-    "--smiles_language_filepath",
-    type=str,
-    default="Config/ChemVAE_selfies_language.pkl",
-    help="Path to a pickle of a SMILES language object.",
-)
 parser.add_argument(
     "--params_filepath",
     type=str,
-    default="Config/ChemVAE.json",
+    default="Config/ChemGG.json",
     help="Path to the parameter file.",
 )
 
@@ -50,44 +43,30 @@ parser = pl.Trainer.add_argparse_args(parser)
 parser.set_defaults(gpus=1, accelerator="ddp")
 
 # Dataset args
-parser = ChemVAE_DataModule.add_argparse_args(parser)
+parser = ChemGG_DataModule.add_argparse_args(parser)
 args, _ = parser.parse_known_args()
 pl.seed_everything(args.seed)
 
-# Parameter update
+# Load parameter
 params = {}
 with open(args.params_filepath) as f:
     params.update(json.load(f))
-smiles_language = SMILESLanguage.load(args.smiles_language_filepath)
-
-vocab_dict = smiles_language.index_to_token
-params.update(
-    {
-        "start_index": list(vocab_dict.keys())[
-            list(vocab_dict.values()).index("<START>")
-        ],
-        "end_index": list(vocab_dict.keys())[list(vocab_dict.values()).index("<STOP>")],
-    }
-)
-
-if params.get("embedding", "learned") == "one_hot":
-    params.update({"embedding_size": params["vocab_size"]})
-
-# Parameter save
-with open(args.params_filepath, "w") as f:
-    json.dump(params, f)
 
 # Define dataset and model
-net = ChemVAE_Module(**vars(args))
-data = ChemVAE_DataModule(**vars(args))
+data = ChemGG_DataModule(**vars(args))
+analyzer = ChemGG_Analyzer(
+    train_dataloader=data.train_dataloader(),
+    valid_dataloader=data.val_dataloader()
+)
+net = ChemGG_Module(**vars(args), analyzer=analyzer)
 
 # (Optional) Transfer Learning
 ckpt = args.checkpoint_filepath
 if not ckpt == "":
-    net = ChemVAE_Module.load_from_checkpoint(ckpt, **vars(args))
+    net = ChemGG_Module.load_from_checkpoint(ckpt, **vars(args))
 
 # Define pytorch-lightning Trainer multiple callbacks
-monitor = ["loss", "kl_div"]
+monitor = ["loss"]
 callbacks = []
 for i in monitor:
     callbacks.append(
@@ -103,7 +82,7 @@ for i in monitor:
 # Define pytorch-lightning Trainer
 trainer = pl.Trainer.from_argparse_args(
     args,
-    max_epochs=params.get("epochs", 100),
+    max_epochs=params["CONFIG"].get("epochs", 100),
     logger=loggers.WandbLogger(
         entity=args.entity, project=args.project, name=args.model_name, log_model=True
     ),

@@ -7,6 +7,29 @@ from Utility.data_utils import HDFDataset, BlockDataLoader
 
 
 class ChemGG_DataModule(pl.LightningDataModule):
+    @classmethod
+    def add_argparse_args(
+            cls, parent_parser: ArgumentParser, **kwargs
+    ) -> ArgumentParser:
+        parser = parent_parser.add_argument_group(cls.__name__)
+        parser.add_argument(
+            "--train_hdf_filepath",
+            type=str,
+            default="data/pretraining/ChemGG/train.h5",
+        )
+        parser.add_argument(
+            "--valid_hdf_filepath",
+            type=str,
+            default="data/pretraining/ChemGG/valid.h5",
+        )
+        parser.add_argument(
+            "--test_hdf_filepath",
+            type=str,
+            default="data/pretraining/ChemGG/test.h5",
+        )
+
+        return parent_parser
+
     def __init__(
         self,
         train_hdf_filepath: str,

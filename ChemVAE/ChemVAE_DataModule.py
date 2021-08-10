@@ -19,12 +19,12 @@ class ChemVAE_DataModule(pl.LightningDataModule):
         parser.add_argument(
             "--train_smiles_filepath",
             type=str,
-            default="data/pretraining/SELFIESVAE/train_chembl_22_clean_1576904_sorted_std_final.smi",
+            default="data/pretraining/ChemVAE/train_chembl_22_clean_1576904_sorted_std_final.smi",
         )
         parser.add_argument(
             "--test_smiles_filepath",
             type=str,
-            default="data/pretraining/SELFIESVAE/test_chembl_22_clean_1576904_sorted_std_final.smi",
+            default="data/pretraining/ChemVAE/test_chembl_22_clean_1576904_sorted_std_final.smi",
         )
         parser.add_argument(
             "--train_dataset_filepath",

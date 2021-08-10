@@ -1,5 +1,4 @@
 # load general packages and functions
-from collections import namedtuple
 import itertools
 import random
 from copy import deepcopy
@@ -17,7 +16,7 @@ from Utility.utils import (
 
 
 # defines `MolecularGraph` parent class and three subclasses
-class MolecularGraph:
+class ChemGG_MolGraph:
     """
     Parent class for all molecular graphs.
 
@@ -34,7 +33,7 @@ class MolecularGraph:
 
     def __init__(
         self,
-        params: namedtuple,
+        params: dict,
         molecule: rdkit.Chem.Mol,
         node_features: Union[np.ndarray, th.Tensor],
         edge_features: Union[np.ndarray, th.Tensor],
@@ -43,7 +42,7 @@ class MolecularGraph:
         """
         Args:
         ----
-            params (namedtuple) : Contains job parameters as well as global params.
+            params (dict) : Contains job parameters as well as global params.
             molecule (rdkit.Chem.Mol) : Input used for creating `PreprocessingGraph`.
             atom_feature_vector (th.Tensor) : Input used for creating `TrainingGraph`.
         """
@@ -254,14 +253,14 @@ class MolecularGraph:
         self.edge_features = edge_features  # not padded!
 
 
-class PreprocessingGraph(MolecularGraph):
+class ChemGG_PreprocessingGraph(ChemGG_MolGraph):
     """
     Class for molecular graphs to be used during the data preprocessing phase.
     Uses `np.ndarray`s for the graph attributes, so they can be stored as HDF5
     datasets. These are never loaded onto the GPU.
     """
 
-    def __init__(self, params: namedtuple, molecule: rdkit.Chem.Mol) -> None:
+    def __init__(self, params: dict, molecule: rdkit.Chem.Mol) -> None:
         super().__init__(
             params,
             molecule=False,
@@ -719,13 +718,13 @@ class PreprocessingGraph(MolecularGraph):
         return decoding_graph, decoding_APD
 
 
-class TrainingGraph(MolecularGraph):
+class ChemGG_TrainingGraph(ChemGG_MolGraph):
     """
     Class for molecular graphs to be used during model training. Uses `th.Tensor`s for
     the graph attributes, so they can be conveniently used on the GPU.
     """
 
-    def __init__(self, params: namedtuple, atom_feature_vector: th.Tensor) -> None:
+    def __init__(self, params: dict, atom_feature_vector: th.Tensor) -> None:
         super().__init__(
             params,
             molecule=False,
@@ -772,7 +771,7 @@ class TrainingGraph(MolecularGraph):
         return node_features_tensor, adjacency_tensor
 
 
-class GenerationGraph(MolecularGraph):
+class ChemGG_GenerationGraph(ChemGG_MolGraph):
     """
     Class for molecular graphs to be used during graph generation. Uses `th.Tensor`s for
     the graph attributes, so they can be conveniently used on the GPU.
@@ -780,7 +779,7 @@ class GenerationGraph(MolecularGraph):
 
     def __init__(
         self,
-        params: namedtuple,
+        params: dict,
         molecule: rdkit.Chem.Mol,
         node_features: th.Tensor,
         edge_features: th.Tensor,
