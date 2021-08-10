@@ -1,9 +1,11 @@
 from argparse import ArgumentParser
 from typing import Optional
 import json
+
+from torch.utils.data import DataLoader
 import pytorch_lightning as pl
 
-from Utility.data_utils import HDFDataset, BlockDataLoader
+from Utility.data_utils import HDFDataset
 
 
 class ChemGG_DataModule(pl.LightningDataModule):
@@ -32,6 +34,7 @@ class ChemGG_DataModule(pl.LightningDataModule):
 
     def __init__(
         self,
+        project_filepath: str,
         train_hdf_filepath: str,
         valid_hdf_filepath: str,
         test_hdf_filepath: str,
@@ -40,9 +43,9 @@ class ChemGG_DataModule(pl.LightningDataModule):
         **kwargs,
     ) -> None:
         super(ChemGG_DataModule, self).__init__()
-        self.train_hdf_filepath = train_hdf_filepath
-        self.valid_hdf_filepath = valid_hdf_filepath
-        self.test_hdf_filepath = test_hdf_filepath
+        self.train_hdf_filepath = project_filepath + train_hdf_filepath
+        self.valid_hdf_filepath = project_filepath + valid_hdf_filepath
+        self.test_hdf_filepath = project_filepath + test_hdf_filepath
         # load parameters
         self.params = {}
         with open(params_filepath) as f:
@@ -53,21 +56,20 @@ class ChemGG_DataModule(pl.LightningDataModule):
         self.valid_dataset = HDFDataset(self.valid_hdf_filepath)
         self.test_dataset = HDFDataset(self.test_hdf_filepath)
 
-    def dataloader(self, dataset: HDFDataset) -> BlockDataLoader:
-        return BlockDataLoader(
+    def dataloader(self, dataset: HDFDataset) -> DataLoader:
+        return DataLoader(
             dataset=dataset,
             batch_size=self.params.get("batch_size", 1000),
-            block_size=self.params.get("block_size", 10000),
             shuffle=self.params.get("shuffle", True),
-            n_workers=self.params.get("n_workers", 32),
+            num_workers=self.params.get("n_workers", 32),
             pin_memory=self.params.get("pin_memory", True),
         )
 
-    def train_dataloader(self) -> BlockDataLoader:
+    def train_dataloader(self) -> DataLoader:
         return self.dataloader(self.train_dataset)
 
-    def val_dataloader(self) -> BlockDataLoader:
+    def val_dataloader(self) -> DataLoader:
         return self.dataloader(self.valid_dataset)
 
-    def test_dataloader(self) -> BlockDataLoader:
+    def test_dataloader(self) -> DataLoader:
         return self.dataloader(self.test_dataset)

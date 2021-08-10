@@ -14,8 +14,8 @@ class MNN(SummationMPNN):
     The "message neural network" model.
     """
 
-    def __init__(self) -> None:
-        super(MNN, self).__init__()
+    def __init__(self, params: dict) -> None:
+        super(MNN, self).__init__(params)
 
         mlp1_hidden_dim = self.params.get("mlp1_hidden_dim", 500)
         mlp1_depth = self.params.get("mlp1_depth", 4)
@@ -58,7 +58,7 @@ class MNN(SummationMPNN):
     def message_terms(
         self, nodes: th.Tensor, node_neighbours: th.Tensor, edges: th.Tensor
     ) -> th.Tensor:
-        edges_view = edges.view(-1, 1, 1, self.n_edge_features)
+        edges_view = edges.view(-1, 1, 1, self.edge_features)
         weights_for_each_edge = (edges_view * self.message_weights.unsqueeze(0)).sum(3)
         return th.matmul(weights_for_each_edge, node_neighbours.unsqueeze(-1)).squeeze()
 
@@ -81,8 +81,8 @@ class S2V(SummationMPNN):
     The "set2vec" model.
     """
 
-    def __init__(self) -> None:
-        super(S2V, self).__init__()
+    def __init__(self, params: dict) -> None:
+        super(S2V, self).__init__(params)
 
         enn_hidden_dim = self.params.get("enn_hidden_dim", 250)
         enn_depth = self.params.get("enn_depth", 4)
@@ -156,8 +156,8 @@ class AttentionS2V(AggregationMPNN):
     The "set2vec with attention" model.
     """
 
-    def __init__(self) -> None:
-        super(AttentionS2V, self).__init__()
+    def __init__(self, params: dict) -> None:
+        super(AttentionS2V, self).__init__(params)
 
         att_hidden_dim = self.params.get("att_hidden_dim", 250)
         att_depth = self.params.get("att_depth", 4)
@@ -256,8 +256,8 @@ class GGNN(SummationMPNN):
     The "gated-graph neural network" model.
     """
 
-    def __init__(self) -> None:
-        super(GGNN, self).__init__()
+    def __init__(self, params: dict) -> None:
+        super(GGNN, self).__init__(params)
 
         enn_hidden_dim = self.params.get("enn_hidden_dim", 250)
         enn_depth = self.params.get("enn_depth", 4)
@@ -350,8 +350,8 @@ class AttentionGGNN(AggregationMPNN):
     The "GGNN with attention" model.
     """
 
-    def __init__(self) -> None:
-        super(AttentionGGNN, self).__init__()
+    def __init__(self, params: dict) -> None:
+        super(AttentionGGNN, self).__init__(params)
 
         msg_hidden_dim = self.params.get("msg_hidden_dim", 250)
         msg_depth = self.params.get("msg_depth", 4)
@@ -467,8 +467,8 @@ class EMN(EdgeMPNN):
     The "edge memory network" model.
     """
 
-    def __init__(self) -> None:
-        super(EMN, self).__init__()
+    def __init__(self, params: dict) -> None:
+        super(EMN, self).__init__(params)
 
         edge_emb_hidden_dim = self.params.get("edge_emb_hidden_dim", 250)
         edge_emb_depth = self.params.get("edge_emb_depth", 4)

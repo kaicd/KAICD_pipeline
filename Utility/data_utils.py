@@ -4,8 +4,8 @@ import h5py
 from typing import Tuple
 import pandas as pd
 import torch as th
-from torch.utils.data.dataset import Dataset
-from torch.utils.data.dataloader import DataLoader
+from torch.utils.data import Dataset
+from torch.utils.data import DataLoader
 from pytoda.files import read_smi
 
 
@@ -148,7 +148,6 @@ class BlockDataLoader(DataLoader):
         )
 
     def __iter__(self):
-
         # define a regular `DataLoader` using the `BlockDataset`
         block_loader = DataLoader(
             self.block_dataset, shuffle=self.shuffle, num_workers=self.n_workers

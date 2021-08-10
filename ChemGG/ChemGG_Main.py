@@ -5,7 +5,7 @@ import pytorch_lightning as pl
 from pytorch_lightning import loggers
 from pytorch_lightning.callbacks import ModelCheckpoint
 
-from .ChemGG_Analyzer import ChemGG_Analyzer
+from ChemGG_Analyzer import ChemGG_Analyzer
 from ChemGG_Module import ChemGG_Module
 from ChemGG_DataModule import ChemGG_DataModule
 
@@ -54,7 +54,10 @@ with open(args.params_filepath) as f:
 
 # Define dataset and model
 data = ChemGG_DataModule(**vars(args))
+data.setup()
 analyzer = ChemGG_Analyzer(
+    save_filepath=args.project_filepath + "ChemGG/",
+    params=params,
     train_dataloader=data.train_dataloader(),
     valid_dataloader=data.val_dataloader()
 )

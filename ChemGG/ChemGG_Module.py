@@ -3,9 +3,9 @@ import json
 import torch as th
 import pytorch_lightning as pl
 
-from .ChemGG_Analyzer import ChemGG_Analyzer
-from .ChemGG_Generator import ChemGG_Generator
 from ChemGG import ChemGG_MPNN
+from ChemGG_Analyzer import ChemGG_Analyzer
+from ChemGG_Generator import ChemGG_Generator
 from Utility.hyperparams import OPTIMIZER_FACTORY
 from Utility.utils import update_features
 from Utility.loss_functions import gg_loss
@@ -16,7 +16,9 @@ class ChemGG_Module(pl.LightningModule):
         self,
         model_name: str,
         params_filepath: str,
-        analyzer: ChemGG_Analyzer
+        analyzer: ChemGG_Analyzer,
+        *args,
+        **kwargs,
     ):
         super(ChemGG_Module, self).__init__()
         # load model parameters
@@ -70,7 +72,7 @@ class ChemGG_Module(pl.LightningModule):
         scheduler = {
             "scheduler": th.optim.lr_scheduler.LambdaLR(
                 opt,
-                lr_lambda=lambda epoch: max(1e-7, 1 - epoch / self.epochs),
+                lr_lambda=lambda epoch: max(1e-7, 1 - epoch / self.params["epochs"]),
             ),
             "reduce_on_plateau": False,
             "interval": "epoch",
