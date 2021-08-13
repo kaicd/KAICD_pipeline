@@ -13,6 +13,8 @@ import torch.nn as nn
 from torch.distributions.normal import Normal
 from torch.distributions.bernoulli import Bernoulli
 from rdkit.Chem.rdchem import BondType
+from rdkit import Chem
+from rdkit.Chem import AllChem, DataStructs
 
 import pytoda
 from pytoda.transforms import Compose
@@ -725,6 +727,16 @@ def update_features(params):
     update_params.update(feature_params)
 
     return update_params
+
+
+def get_fp(mol: Union[Chem.Mol, str], r=3, nBits=2048, **kwargs) -> np.ndarray:
+    if isinstance(mol, str):
+        mol = Chem.MolFromSmiles(mol)
+    fp = AllChem.GetMorganFingerprintAsBitVect(mol, r, nBits=nBits, **kwargs)
+    arr = np.zeros((0,), dtype=np.int8)
+    # noinspection PyUnresolvedReferences
+    DataStructs.ConvertToNumpyArray(fp, arr)
+    return arr
 
 
 class Squeeze(nn.Module):

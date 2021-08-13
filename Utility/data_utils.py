@@ -134,8 +134,10 @@ class BlockDataLoader(DataLoader):
         shuffle: bool = True,
         n_workers: int = 0,
         pin_memory: bool = True,
+        *args,
+        **kwargs,
     ) -> None:
-
+        super(BlockDataLoader, self).__init__()
         # define variables to be used throughout dataloading
         self.dataset = dataset  # `HDFDataset` object
         self.batch_size = batch_size  # `int`

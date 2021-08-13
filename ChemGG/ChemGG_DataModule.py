@@ -5,13 +5,13 @@ import json
 from torch.utils.data import DataLoader
 import pytorch_lightning as pl
 
-from Utility.data_utils import HDFDataset
+from Utility.data_utils import HDFDataset, BlockDataLoader
 
 
 class ChemGG_DataModule(pl.LightningDataModule):
     @classmethod
     def add_argparse_args(
-            cls, parent_parser: ArgumentParser, **kwargs
+        cls, parent_parser: ArgumentParser, **kwargs
     ) -> ArgumentParser:
         parser = parent_parser.add_argument_group(cls.__name__)
         parser.add_argument(
@@ -56,8 +56,8 @@ class ChemGG_DataModule(pl.LightningDataModule):
         self.valid_dataset = HDFDataset(self.valid_hdf_filepath)
         self.test_dataset = HDFDataset(self.test_hdf_filepath)
 
-    def dataloader(self, dataset: HDFDataset) -> DataLoader:
-        return DataLoader(
+    def dataloader(self, dataset: HDFDataset) -> BlockDataLoader:
+        return BlockDataLoader(
             dataset=dataset,
             batch_size=self.params.get("batch_size", 1000),
             shuffle=self.params.get("shuffle", True),

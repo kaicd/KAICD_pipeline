@@ -105,11 +105,13 @@ class ChemGG_Module(pl.LightningModule):
             graphs, action_nlls, final_nlls, termination = generator.sample()
 
             # analyze properties of new graphs and save results
-            self.analyzer.evaluate_generated_graphs(generated_graphs=graphs,
-                                                    termination=termination,
-                                                    nlls=final_nlls,
-                                                    ts_properties=self.ts_properties,
-                                                    generation_batch_idx=idx)
+            self.analyzer.evaluate_generated_graphs(
+                generated_graphs=graphs,
+                termination=termination,
+                nlls=final_nlls,
+                ts_properties=self.ts_properties,
+                generation_batch_idx=idx,
+            )
 
             # keep track of NLLs per action; note that only NLLs for the first batch are kept,
             # as only a few are needed to evaluate the model (more efficient than saving all)

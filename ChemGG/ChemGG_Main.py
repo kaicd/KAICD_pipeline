@@ -25,9 +25,7 @@ parser.add_argument(
     type=str,
     default="ChemGG/checkpoint/",
 )
-parser.add_argument(
-    "--checkpoint_filepath", type=str, default=""
-)
+parser.add_argument("--checkpoint_filepath", type=str, default="")
 parser.add_argument("--model_name", type=str, default="MNN")
 parser.add_argument("--seed", type=int, default=42)
 
@@ -59,7 +57,7 @@ analyzer = ChemGG_Analyzer(
     save_filepath=args.project_filepath + "ChemGG/",
     params=params,
     train_dataloader=data.train_dataloader(),
-    valid_dataloader=data.val_dataloader()
+    valid_dataloader=data.val_dataloader(),
 )
 net = ChemGG_Module(**vars(args), analyzer=analyzer)
 

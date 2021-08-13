@@ -21,12 +21,8 @@ class ChemGG_Generator:
     Class for graph generation. Generates graphs in batches using the defined model.
     Optimized for quick generation on a GPU (sacrificed a bit of readability for speed here).
     """
-    def __init__(
-            self,
-            model: nn.Module,
-            batch_size: int,
-            params: dict
-    ) -> None:
+
+    def __init__(self, model: nn.Module, batch_size: int, params: dict) -> None:
         """
         Args:
         ----
@@ -74,18 +70,17 @@ class ChemGG_Generator:
         graphs = [self.graph_to_graph(idx) for idx in range(self.batch_size)]
 
         # sum NLL per action to get the total NLL for each structure; remove extra zero padding
-        final_nlls = th.sum(self.generated_nlls, dim=1)[:self.batch_size]
+        final_nlls = th.sum(self.generated_nlls, dim=1)[: self.batch_size]
 
         # remove extra zero padding from NLLs
         generated_nlls = self.generated_nlls[self.generated_nlls != 0]
 
         # remove extra padding from `properly_terminated` tensor
-        properly_terminated = self.properly_terminated[:self.batch_size]
+        properly_terminated = self.properly_terminated[: self.batch_size]
 
         return graphs, generated_nlls, final_nlls, properly_terminated
 
-
-    def build_graphs(self) ->  int:
+    def build_graphs(self) -> int:
         """
         Builds molecular graphs in batches, starting from empty graphs.
         Returns:
@@ -111,7 +106,9 @@ class ChemGG_Generator:
             add, conn, term, invalid, nlls_just_sampled = self.get_actions(apd)
 
             # indicate (with a 1) the structures which have been properly terminated
-            self.properly_terminated[n_generated_so_far:(n_generated_so_far + len(term))] = 1
+            self.properly_terminated[
+                n_generated_so_far : (n_generated_so_far + len(term))
+            ] = 1
 
             # collect the indices for all structures to write (and reset) this round
             termination_idc = th.cat((term, invalid))
@@ -121,10 +118,9 @@ class ChemGG_Generator:
 
             # copy the graphs indicated by `terminated_idc` to the tensors for
             # finished graphs (i.e. `generated_{nodes/edges}`)
-            n_generated_so_far = self.copy_terminated_graphs(termination_idc,
-                                                             n_generated_so_far,
-                                                             generation_round,
-                                                             nlls_just_sampled)
+            n_generated_so_far = self.copy_terminated_graphs(
+                termination_idc, n_generated_so_far, generation_round, nlls_just_sampled
+            )
 
             # apply actions to all graphs (note: applies dummy actions to terminated
             # graphs, since output will be reset anyways)
@@ -151,7 +147,10 @@ class ChemGG_Generator:
         # define tensor shapes
         node_shape = (self.batch_size, *self.params["dim_nodes"])
         edge_shape = (self.batch_size, *self.params["dim_edges"])
-        nlls_shape = (self.batch_size, self.params["max_n_nodes"] * 2)  # the 2 is arbitrary
+        nlls_shape = (
+            self.batch_size,
+            self.params["max_n_nodes"] * 2,
+        )  # the 2 is arbitrary
 
         # allocate a buffer equal to the size of an extra batch
         n_allocate = self.batch_size * 2
@@ -159,14 +158,10 @@ class ChemGG_Generator:
         # create the placeholder tensors:
 
         # placeholder for node features tensor for all graphs
-        self.generated_nodes = th.zeros((n_allocate, *node_shape[1:]),
-                                           dtype=th.float32
-                                        )
+        self.generated_nodes = th.zeros((n_allocate, *node_shape[1:]), dtype=th.float32)
 
         # placeholder for edge features tensor for all graphs
-        self.generated_edges = th.zeros((n_allocate, *edge_shape[1:]),
-                                           dtype=th.float32
-                                        )
+        self.generated_edges = th.zeros((n_allocate, *edge_shape[1:]), dtype=th.float32)
 
         # placeholder for number of nodes per graph in all graphs
         self.generated_n_nodes = th.zeros(n_allocate, dtype=th.int8)
@@ -180,10 +175,13 @@ class ChemGG_Generator:
         # placeholder for graph termination status (1 == properly terminated, 0 == improper)
         self.properly_terminated = th.zeros(n_allocate, dtype=th.int8)
 
-
-    def apply_actions(self, add : Tuple[th.Tensor, ...],
-                      conn : Tuple[th.Tensor, ...], generation_round : int,
-                      nlls_sampled : th.Tensor) -> None:
+    def apply_actions(
+        self,
+        add: Tuple[th.Tensor, ...],
+        conn: Tuple[th.Tensor, ...],
+        generation_round: int,
+        nlls_sampled: th.Tensor,
+    ) -> None:
         """
         Applies the batch of sampled actions (specified by `add` and `conn`) to
         the batch of graphs under construction. Also adds the NLLs for the newly
@@ -201,8 +199,10 @@ class ChemGG_Generator:
             nlls_sampled (th.Tensor) : NLL per action sampled for the most recent
               set of actions.
         """
-        def _add_nodes(add : Tuple[th.Tensor, ...], generation_round : int,
-                       nlls_sampled : th.Tensor) -> None:
+
+        def _add_nodes(
+            add: Tuple[th.Tensor, ...], generation_round: int, nlls_sampled: th.Tensor
+        ) -> None:
             """
             Adds new nodes to graphs which sampled the "add" action.
             Args:
@@ -214,19 +214,32 @@ class ChemGG_Generator:
             """
             # get the action indices
             add = [idx.long() for idx in add]
-            n_node_features = [self.params["n_atom_types"],
-                               self.params["n_formal_charge"],
-                               self.params["n_imp_H"],
-                               self.params["n_chirality"]]
+            n_node_features = [
+                self.params["n_atom_types"],
+                self.params["n_formal_charge"],
+                self.params["n_imp_H"],
+                self.params["n_chirality"],
+            ]
 
             if not self.params["use_explicit_H"] and not self.params["ignore_H"]:
                 if self.params["use_chirality"]:
-                    batch, bond_to, atom_type, charge, imp_h, chirality, bond_type, bond_from = add
+                    (
+                        batch,
+                        bond_to,
+                        atom_type,
+                        charge,
+                        imp_h,
+                        chirality,
+                        bond_type,
+                        bond_from,
+                    ) = add
                     # add the new nodes to the node features tensors
                     self.nodes[batch, bond_from, atom_type] = 1
                     self.nodes[batch, bond_from, charge + n_node_features[0]] = 1
                     self.nodes[batch, bond_from, imp_h + sum(n_node_features[0:2])] = 1
-                    self.nodes[batch, bond_from, chirality + sum(n_node_features[0:3])] = 1
+                    self.nodes[
+                        batch, bond_from, chirality + sum(n_node_features[0:3])
+                    ] = 1
                 else:
                     batch, bond_to, atom_type, charge, imp_h, bond_type, bond_from = add
                     # add the new nodes to the node features tensors
@@ -252,8 +265,12 @@ class ChemGG_Generator:
             bond_type_masked = bond_type[th.nonzero(self.n_nodes[batch] != 0)]
 
             # connect newly added nodes to the graphs
-            self.edges[batch_masked, bond_to_masked, bond_from_masked, bond_type_masked] = 1
-            self.edges[batch_masked, bond_from_masked, bond_to_masked, bond_type_masked] = 1
+            self.edges[
+                batch_masked, bond_to_masked, bond_from_masked, bond_type_masked
+            ] = 1
+            self.edges[
+                batch_masked, bond_from_masked, bond_to_masked, bond_type_masked
+            ] = 1
 
             # keep track of the newly added node
             self.n_nodes[batch] += 1
@@ -261,9 +278,9 @@ class ChemGG_Generator:
             # include the NLLs for the add actions for this generation round
             self.nlls[batch, generation_round] = nlls_sampled[batch]
 
-
-        def _conn_nodes(conn : Tuple[th.Tensor, ...], generation_round : int,
-                        nlls_sampled : th.Tensor) -> None:
+        def _conn_nodes(
+            conn: Tuple[th.Tensor, ...], generation_round: int, nlls_sampled: th.Tensor
+        ) -> None:
             """
             Connects nodes in graphs which sampled the "connect" action.
             Args:
@@ -292,8 +309,13 @@ class ChemGG_Generator:
         # nothing if a graph did not sample "connect")
         _conn_nodes(conn, generation_round, nlls_sampled)
 
-    def copy_terminated_graphs(self, terminate_idc : th.Tensor, n_graphs_generated : int,
-                               generation_round : int, nlls_sampled : th.Tensor) -> int:
+    def copy_terminated_graphs(
+        self,
+        terminate_idc: th.Tensor,
+        n_graphs_generated: int,
+        generation_round: int,
+        nlls_sampled: th.Tensor,
+    ) -> int:
         """
         Copies terminated graphs (either because "terminate" action sampled, or
         invalid action sampled) to `generated_nodes` and `generated_edges` before
@@ -324,10 +346,10 @@ class ChemGG_Generator:
 
         begin_idx = n_graphs_generated
         end_idx = n_graphs_generated + n_done_graphs
-        self.generated_nodes[begin_idx : end_idx] = nodes_local
-        self.generated_edges[begin_idx : end_idx] = edges_local
-        self.generated_n_nodes[begin_idx : end_idx] = n_nodes_local
-        self.generated_nlls[begin_idx : end_idx] = nlls_local
+        self.generated_nodes[begin_idx:end_idx] = nodes_local
+        self.generated_edges[begin_idx:end_idx] = edges_local
+        self.generated_n_nodes[begin_idx:end_idx] = n_nodes_local
+        self.generated_nlls[begin_idx:end_idx] = nlls_local
 
         n_graphs_generated += n_done_graphs
 
@@ -346,8 +368,8 @@ class ChemGG_Generator:
         is a silent error in the message update function of the MPNNs).
         """
         # define tensor shapes
-        node_shape = ([self.batch_size] + self.params["dim_nodes"])
-        edge_shape = ([self.batch_size] + self.params["dim_edges"])
+        node_shape = [self.batch_size] + self.params["dim_nodes"]
+        edge_shape = [self.batch_size] + self.params["dim_edges"]
         n_nodes_shape = [self.batch_size]
 
         # initialize tensors
@@ -360,7 +382,7 @@ class ChemGG_Generator:
         self.edges[0, 0, 0, 0] = 1
         self.n_nodes[0] = 1
 
-    def reset_graphs(self, idc : int) -> None:
+    def reset_graphs(self, idc: int) -> None:
         """
         Resets the `nodes` and `edges` tensors by reseting graphs which sampled
         invalid actions (indicated by `idc`). Updates the following:
@@ -372,32 +394,26 @@ class ChemGG_Generator:
         ----
             idc (int) : Indices corresponding to graphs to reset.
         """
-        node_shape = ([self.batch_size] + self.params["dim_nodes"])
-        edge_shape = ([self.batch_size] + self.params["dim_edges"])
-        n_nodes_shape = ([self.batch_size])
-        nlls_shape = ([self.batch_size] + [self.params["max_n_nodes"] * 2])  # the 2 is arbitrary
+        node_shape = [self.batch_size] + self.params["dim_nodes"]
+        edge_shape = [self.batch_size] + self.params["dim_edges"]
+        n_nodes_shape = [self.batch_size]
+        nlls_shape = [self.batch_size] + [
+            self.params["max_n_nodes"] * 2
+        ]  # the 2 is arbitrary
 
         # reset the "bad" graphs with zero tensors
         if len(idc) > 0:
-            self.nodes[idc] = th.zeros((len(idc), *node_shape[1:]),
-                                          dtype=th.float32
-                                       )
-            self.edges[idc] = th.zeros((len(idc), *edge_shape[1:]),
-                                          dtype=th.float32
-                                       )
-            self.n_nodes[idc] = th.zeros((len(idc), *n_nodes_shape[1:]),
-                                            dtype=th.int8
-                                         )
-            self.nlls[idc] = th.zeros((len(idc), *nlls_shape[1:]),
-                                         dtype=th.float32
-                                      )
+            self.nodes[idc] = th.zeros((len(idc), *node_shape[1:]), dtype=th.float32)
+            self.edges[idc] = th.zeros((len(idc), *edge_shape[1:]), dtype=th.float32)
+            self.n_nodes[idc] = th.zeros((len(idc), *n_nodes_shape[1:]), dtype=th.int8)
+            self.nlls[idc] = th.zeros((len(idc), *nlls_shape[1:]), dtype=th.float32)
 
         # create a dummy non-empty graph
         self.nodes[0] = th.ones(([1] + self.params["dim_nodes"]))
         self.edges[0, 0, 0, 0] = 1
         self.n_nodes[0] = 1
 
-    def get_actions(self, apds : th.Tensor) -> Tuple[th.Tensor, ...]:
+    def get_actions(self, apds: th.Tensor) -> Tuple[th.Tensor, ...]:
         """
         Samples the input batch of APDs for a batch of actions to apply to the graphs,
         and separates the action indices.
@@ -413,7 +429,8 @@ class ChemGG_Generator:
               an invalid action.
             nlls (th.Tensor) : NLLs per action corresponding to graphs in batch.
         """
-        def _reshape_apd(apds : th.Tensor, batch_size : int) -> Tuple[th.Tensor, ...]:
+
+        def _reshape_apd(apds: th.Tensor, batch_size: int) -> Tuple[th.Tensor, ...]:
             """
             Reshapes the input batch of APDs (inverse to flattening).
             Args:
@@ -440,7 +457,7 @@ class ChemGG_Generator:
 
             return f_add, f_conn, f_term
 
-        def _sample_apd(apds : th.Tensor, batch_size : int) -> Tuple[th.Tensor, ...]:
+        def _sample_apd(apds: th.Tensor, batch_size: int) -> Tuple[th.Tensor, ...]:
             """
             Samples the input APDs for all graphs in the batch.
             Args:
@@ -454,7 +471,9 @@ class ChemGG_Generator:
                 term_idc (th.Tensor) : Nonzero elements in `f_term`.
                 nlls (th.Tensor) : Contains NLLs for samples actions.
             """
-            action_probability_distribution = th.distributions.Multinomial(1, probs=apds)
+            action_probability_distribution = th.distributions.Multinomial(
+                1, probs=apds
+            )
             apd_one_hot = action_probability_distribution.sample()
             f_add, f_conn, f_term = _reshape_apd(apd_one_hot, batch_size)
 
@@ -485,11 +504,9 @@ class ChemGG_Generator:
 
         return f_add_idc, f_conn_idc, f_term_idc, invalid_idc, nlls
 
-
-    def get_invalid_actions(self,
-                            f_add_idc : Tuple[th.Tensor, ...],
-                            f_conn_idc : Tuple[th.Tensor, ...]) \
-                            -> Tuple[th.Tensor, th.Tensor]:
+    def get_invalid_actions(
+        self, f_add_idc: Tuple[th.Tensor, ...], f_conn_idc: Tuple[th.Tensor, ...]
+    ) -> Tuple[th.Tensor, th.Tensor]:
         """
         Gets the indices corresponding to any invalid sampled actions.
         Args:
@@ -537,34 +554,35 @@ class ChemGG_Generator:
 
         # get invalid indices for when attemting to add multiple edges
         invalid_dconn_idc = th.nonzero(
-            th.sum(self.edges, dim=-1)[f_conn_idc[0].long(),
-                                          f_conn_idc[1].long(),
-                                          f_conn_idc[-1].long()] == 1
+            th.sum(self.edges, dim=-1)[
+                f_conn_idc[0].long(), f_conn_idc[1].long(), f_conn_idc[-1].long()
+            ]
+            == 1
         )
 
         # only need one invalid index per graph
-        invalid_action_idc =th.unique(
+        invalid_action_idc = th.unique(
             th.cat(
-                (f_add_idc[0][invalid_add_idc],
-                 f_add_idc[0][invalid_add_empty_idc],
-                 f_conn_idc[0][invalid_conn_idc],
-                 f_conn_idc[0][invalid_conn_nonex_idc],
-                 f_conn_idc[0][invalid_sconn_idc],
-                 f_conn_idc[0][invalid_dconn_idc],
-                 f_add_idc[0][invalid_madd_idc])
+                (
+                    f_add_idc[0][invalid_add_idc],
+                    f_add_idc[0][invalid_add_empty_idc],
+                    f_conn_idc[0][invalid_conn_idc],
+                    f_conn_idc[0][invalid_conn_nonex_idc],
+                    f_conn_idc[0][invalid_sconn_idc],
+                    f_conn_idc[0][invalid_dconn_idc],
+                    f_add_idc[0][invalid_madd_idc],
+                )
             )
         )
 
         # keep track of invalid indices which require reseting during the final "apply_action()"
         invalid_action_idc_needing_reset = th.unique(
-            th.cat(
-                (invalid_madd_idc, f_add_empty_graphs)
-            )
+            th.cat((invalid_madd_idc, f_add_empty_graphs))
         )
 
         return invalid_action_idc, invalid_action_idc_needing_reset
 
-    def graph_to_graph(self, idx : int) -> ChemGG_GenerationGraph:
+    def graph_to_graph(self, idx: int) -> ChemGG_GenerationGraph:
         """
         Converts a molecular graph representation from the individual node and edge feature
         tensors into `GenerationGraph` objects.
@@ -575,7 +593,10 @@ class ChemGG_Generator:
         -------
             graph (GenerationGraph) : Generated graph.
         """
-        def _features_to_atom(node_idx : int, node_features : th.Tensor) -> rdkit.Chem.Atom:
+
+        def _features_to_atom(
+            node_idx: int, node_features: th.Tensor
+        ) -> rdkit.Chem.Atom:
             """
             Converts the node feature vector corresponding to the specified node into
             an atom object.
@@ -605,9 +626,11 @@ class ChemGG_Generator:
 
             # determine number of implicit Hs (if used)
             if not self.params["use_explicit_H"] and not self.params["ignore_H"]:
-                total_num_h_idx = (nonzero_idc[2] -
-                                   self.params["n_atom_types"] -
-                                   self.params["n_formal_charge"])
+                total_num_h_idx = (
+                    nonzero_idc[2]
+                    - self.params["n_atom_types"]
+                    - self.params["n_formal_charge"]
+                )
                 total_num_h = self.params["imp_H"][total_num_h_idx]
 
                 new_atom.SetUnsignedProp("_TotalNumHs", total_num_h)  # set property
@@ -621,15 +644,20 @@ class ChemGG_Generator:
                     nonzero_idc[-1]
                     - self.params["n_atom_types"]
                     - self.params["n_formal_charge"]
-                    - (not self.params["use_explicit_H"] and not self.params["ignore_H"]) * self.params["n_imp_H"]
+                    - (
+                        not self.params["use_explicit_H"]
+                        and not self.params["ignore_H"]
+                    )
+                    * self.params["n_imp_H"]
                 )
                 cip_code = self.params["chirality"][cip_code_idx]
                 new_atom.SetProp("_CIPCode", cip_code)  # set property
 
             return new_atom
 
-        def _graph_to_mol(node_features : th.Tensor, edge_features : th.Tensor,
-                         n_nodes : int) -> rdkit.Chem.Mol:
+        def _graph_to_mol(
+            node_features: th.Tensor, edge_features: th.Tensor, n_nodes: int
+        ) -> rdkit.Chem.Mol:
             """
             Converts input graph represenetation (node and edge features) into an
             `rdkit.Mol` object.
@@ -656,9 +684,7 @@ class ChemGG_Generator:
             # add bonds to atoms in editable mol object; to not add the same bond twice
             # (which leads to an error), mask half of the edge features beyond diagonal
             n_max_nodes = self.params["dim_nodes"][0]
-            edge_mask = th.triu(
-                th.ones((n_max_nodes, n_max_nodes)), diagonal=1
-            )
+            edge_mask = th.triu(th.ones((n_max_nodes, n_max_nodes)), diagonal=1)
             edge_mask = edge_mask.view(n_max_nodes, n_max_nodes, 1)
             edges_idc = th.nonzero(edge_features * edge_mask)
 
@@ -684,16 +710,20 @@ class ChemGG_Generator:
 
         try:
             # first get the `rdkit.Mol` object corresponding to the selected graph
-            mol = _graph_to_mol(self.generated_nodes[idx],
-                                self.generated_edges[idx],
-                                self.generated_n_nodes[idx])
+            mol = _graph_to_mol(
+                self.generated_nodes[idx],
+                self.generated_edges[idx],
+                self.generated_n_nodes[idx],
+            )
         except (IndexError, AttributeError):  # raised when graph is empty
             mol = None
 
         # use the `rdkit.Mol` object, and node and edge features tensors, to get
         # the `GenerationGraph` object
-        graph = ChemGG_GenerationGraph(params=self.params,
-                                       molecule=mol,
-                                       node_features=self.generated_nodes[idx],
-                                       edge_features=self.generated_edges[idx])
+        graph = ChemGG_GenerationGraph(
+            params=self.params,
+            molecule=mol,
+            node_features=self.generated_nodes[idx],
+            edge_features=self.generated_edges[idx],
+        )
         return graph

@@ -216,7 +216,7 @@ class ChemGG_MolGraph:
                 - self.params["n_atom_types"]
                 - self.params["n_formal_charge"]
                 - bool(
-                not self.params["use_explicit_H"] and not self.params["ignore_H"]
+                    not self.params["use_explicit_H"] and not self.params["ignore_H"]
                 )
                 * self.params["n_imp_H"]
             )
