@@ -1,12 +1,24 @@
 """Utilities functions."""
+import os
+import os.path as osp
+import json
 import csv
 import h5py
 from typing import Tuple
+from tqdm import tqdm
+from itertools import repeat
+import numpy as np
 import pandas as pd
 import torch as th
 from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
+from torch_geometric.data import Data, InMemoryDataset, download_url
 from pytoda.files import read_smi
+from rdkit import Chem
+import networkx as nx
+from six.moves import urllib
+
+from .utils import pmap
 
 
 def load_ts_properties(csv_path):
@@ -231,3 +243,308 @@ class ProteinDataset(Dataset):
             sample = self.transform(sample)
 
         return sample
+
+
+class PygDataset(InMemoryDataset):
+    """
+        A `Pytorch Geometric <https://pytorch-geometric.readthedocs.io/en/latest/index.html>`_ data interface for datasets used in molecule generation.
+
+        .. note::
+            Some datasets may not come with any node labels, like :obj:`moses`.
+            Since they don't have any properties in the original data file. The process of the
+            dataset can only save the current input property and will load the same  property
+            label when the processed dataset is used. You can change the augment :obj:`processed_filename`
+            to re-process the dataset with intended property.
+
+        Args:
+            root (string, optional): Root directory where the dataset should be saved. (default: :obj:`./`)
+            name (string, optional): The name of the dataset.  Available dataset names are as follows:
+                                    :obj:`zinc250k`, :obj:`zinc_800_graphaf`, :obj:`zinc_800_jt`, :obj:`zinc250k_property`,
+                                    :obj:`qm9_property`, :obj:`qm9`, :obj:`moses`. (default: :obj:`qm9`)
+            prop_name (string, optional): The molecular property desired and used as the optimization target. (default: :obj:`penalized_logp`)
+            conf_dict (dictionary, optional): dictionary that stores all the configuration for the corresponding dataset. Default is None, but when something is passed, it uses its information. Useful for debugging and customizing for external contributers. (default: :obj:`False`)
+            transform (callable, optional): A function/transform that takes in an
+                :obj:`torch_geometric.data.Data` object and returns a transformed
+                version. The data object will be transformed before every access.
+                (default: :obj:`None`)
+            pre_transform (callable, optional): A function/transform that takes in
+                an :obj:`torch_geometric.data.Data` object and returns a
+                transformed version. The data object will be transformed before
+                being saved to disk. (default: :obj:`None`)
+            pre_filter (callable, optional): A function that takes in an
+                :obj:`torch_geometric.data.Data` object and returns a boolean
+                value, indicating whether the data object should be included in the
+                final dataset. (default: :obj:`None`)
+            use_aug (bool, optional): If :obj:`True`, data augmentation will be used. (default: :obj:`False`)
+            one_shot (bool, optional): If :obj:`True`, the returned data will use one-shot format with an extra dimension of virtual node and edge feature. (default: :obj:`False`)
+        """
+
+    def __init__(self,
+        project_filepath="/raid/KAICD_sarscov2/",
+        preprocess_filepath="data/pretraining/ChemJTVAE/",
+        filename="ZINC_500M_train",
+        params_filepath="Config/ChemJTVAE.json",
+        transform=None,
+        pre_transform=None,
+        pre_filter=None,
+        use_aug=False,
+        one_shot=False
+    ):
+        self.params = {}
+        with open(params_filepath) as f:
+            self.params.update(json.load(f))
+
+        self.root = project_filepath + preprocess_filepath
+        self.name = filename
+        self.use_aug = use_aug
+        self.one_shot = one_shot
+
+        self.num_max_node = self.params.get("num_max_node", 25)
+        self.atom_list = self.params.get("atom_list", [6, 7, 8, 9, 15, 16, 17, 35, 53])
+        self.bond_type_to_int = {
+            Chem.BondType.SINGLE: 0,
+            Chem.BondType.DOUBLE: 1,
+            Chem.BondType.TRIPLE: 2
+        }
+
+        super(PygDataset, self).__init__(
+            self.root,
+            transform,
+            pre_transform,
+            pre_filter
+        )
+        if osp.exists(self.processed_paths[0]):
+            self.data, self.slices, self.all_smiles = th.load(self.processed_paths[0])
+        else:
+            self.process()
+
+        if self.one_shot:
+            self.atom_list = self.atom_list + [0]
+
+    @property
+    def raw_dir(self):
+        name = 'raw'
+        return osp.join(self.root, name)
+
+    @property
+    def processed_dir(self):
+        name = 'processed'
+        if self.one_shot:
+            name = 'processed_' + 'oneshot'
+        return osp.join(self.root, name)
+
+    @property
+    def raw_file_names(self):
+        return self.name + ".smi"
+
+    @property
+    def processed_file_names(self):
+        return self.name + ".pt"
+
+    def download(self):
+        pass
+
+    def process(self):
+        r"""Processes the dataset from raw data file to the :obj:`self.processed_dir` folder.
+
+            If one-hot format is required, the processed data type will include an extra dimension of virtual node and edge feature.
+        """
+
+        print('Processing...')
+        self.data, self.slices = self.pre_process()
+
+        if self.pre_filter is not None:
+            data_list = [self.get(idx) for idx in range(len(self))]
+            data_list = [data for data in data_list if self.pre_filter(data)]
+            self.data, self.slices = self.collate(data_list)
+
+        if self.pre_transform is not None:
+            data_list = [self.get(idx) for idx in range(len(self))]
+            data_list = [self.pre_transform(data) for data in data_list]
+            self.data, self.slices = self.collate(data_list)
+
+        print('making processed files:', self.processed_dir)
+        if not osp.exists(self.processed_dir):
+            os.makedirs(self.processed_dir)
+
+        th.save((self.data, self.slices, self.all_smiles), self.processed_paths[0])
+        print('Done!')
+
+    def __repr__(self):
+        return '{}({})'.format(self.name, len(self))
+
+    def get(self, idx):
+        r"""Gets the data object at index :idx:.
+
+        Args:
+            idx: The index of the data that you want to reach.
+        :rtype: A data object corresponding to the input index :obj:`idx` .
+        """
+        data = self.data.__class__()
+
+        if hasattr(self.data, '__num_nodes__'):
+            data.num_nodes = self.data.__num_nodes__[idx]
+
+        for key in self.data.keys:
+            item, slices = self.data[key], self.slices[key]
+            if th.is_tensor(item):
+                s = list(repeat(slice(None), item.dim()))
+                s[self.data.__cat_dim__(key, item)] = slice(slices[idx], slices[idx + 1])
+            else:
+                s = slice(slices[idx], slices[idx + 1])
+            data[key] = item[s]
+
+        data['smile'] = self.all_smiles[idx]
+
+        if not self.one_shot:
+            # bfs-searching order
+            mol_size = data.num_atom.numpy()[0]
+            pure_adj = np.sum(data.adj[:3].numpy(), axis=0)[:mol_size, :mol_size]
+            if self.use_aug:
+                local_perm = np.random.permutation(mol_size)
+                adj_perm = pure_adj[np.ix_(local_perm, local_perm)]
+                G = nx.from_numpy_matrix(np.asmatrix(adj_perm))
+                start_idx = np.random.randint(adj_perm.shape[0])
+            else:
+                local_perm = np.arange(mol_size)
+                G = nx.from_numpy_matrix(np.asmatrix(pure_adj))
+                start_idx = 0
+
+            bfs_perm = np.array(self._bfs_seq(G, start_idx))
+            bfs_perm_origin = local_perm[bfs_perm]
+            bfs_perm_origin = np.concatenate([bfs_perm_origin, np.arange(mol_size, self.num_max_node)])
+            data.x = data.x[bfs_perm_origin]
+            for i in range(4):
+                data.adj[i] = data.adj[i][bfs_perm_origin][:, bfs_perm_origin]
+
+            data['bfs_perm_origin'] = th.Tensor(bfs_perm_origin).long()
+
+        return data
+
+    def pre_process(self):
+        input_path = self.raw_paths[0]
+        input_smi = open(input_path)
+        smile_list = []
+        prop_list = []
+        for i in input_smi:
+            data = i.split(" ")
+            smile_list.append(data[0])
+            prop_list.append(data[1][:-1])
+
+        self.all_smiles = smile_list
+        data_list = []
+        for i in tqdm(range(len(smile_list))):
+            mol = Chem.MolFromSmiles(smile_list[i])
+            Chem.Kekulize(mol)
+            num_atom = mol.GetNumAtoms()
+
+            if num_atom > self.num_max_node:
+                continue
+
+            if self.one_shot:
+                atom_array = np.zeros((len(self.atom_list), self.num_max_node), dtype=np.int32)
+                virtual_node = np.ones((1, self.num_max_node), dtype=np.int32)
+            else:
+                atom_array = np.zeros((self.num_max_node, len(self.atom_list)), dtype=np.float32)
+
+            atom_idx = 0
+            for atom in mol.GetAtoms():
+                atom_feature = atom.GetAtomicNum()
+                if self.one_shot:
+                    atom_array[self.atom_list.index(atom_feature), atom_idx] = 1
+                    virtual_node[0, atom_idx] = 0
+                else:
+                    atom_array[atom_idx, self.atom_list.index(atom_feature)] = 1
+                atom_idx += 1
+
+            if self.one_shot:
+                x = th.tensor(np.concatenate((atom_array, virtual_node), axis=0))
+            else:
+                x = th.tensor(atom_array)
+
+            # bonds
+            adj_array = np.zeros([4, self.num_max_node, self.num_max_node], dtype=np.float32)
+            for bond in mol.GetBonds():
+                bond_type = bond.GetBondType()
+                ch = self.bond_type_to_int[bond_type]
+                i = bond.GetBeginAtomIdx()
+                j = bond.GetEndAtomIdx()
+                adj_array[ch, i, j] = 1.0
+                adj_array[ch, j, i] = 1.0
+            adj_array[-1, :, :] = 1 - np.sum(adj_array, axis=0)
+            if not self.one_shot:
+                adj_array += np.eye(self.num_max_node)
+
+            data = Data(x=x)
+            data.adj = th.tensor(adj_array)
+            data.num_atom = num_atom
+            data.y = th.tensor([float(prop_list[i])])
+            data_list.append(data)
+
+        data, slices = self.collate(data_list)
+
+        return data, slices
+
+    def smiles_to_graph(self, info, bond_type_to_int, atom_list, num_max_node, one_shot):
+        mol = Chem.MolFromSmiles(info[0])
+        Chem.Kekulize(mol)
+        num_atom = mol.GetNumAtoms()
+
+        if num_atom > num_max_node:
+            return None
+
+        if one_shot:
+            atom_array = np.zeros((len(atom_list), num_max_node), dtype=np.int32)
+            virtual_node = np.ones((1, num_max_node), dtype=np.int32)
+        else:
+            atom_array = np.zeros((num_max_node, len(atom_list)), dtype=np.float32)
+
+        atom_idx = 0
+        for atom in mol.GetAtoms():
+            atom_feature = atom.GetAtomicNum()
+            if one_shot:
+                atom_array[atom_list.index(atom_feature), atom_idx] = 1
+                virtual_node[0, atom_idx] = 0
+            else:
+                atom_array[atom_idx, atom_list.index(atom_feature)] = 1
+            atom_idx += 1
+
+        if one_shot:
+            x = th.tensor(np.concatenate((atom_array, virtual_node), axis=0))
+        else:
+            x = th.tensor(atom_array)
+
+        # bonds
+        adj_array = np.zeros([4, num_max_node, num_max_node], dtype=np.float32)
+        for bond in mol.GetBonds():
+            bond_type = bond.GetBondType()
+            ch = bond_type_to_int[bond_type]
+            i = bond.GetBeginAtomIdx()
+            j = bond.GetEndAtomIdx()
+            adj_array[ch, i, j] = 1.0
+            adj_array[ch, j, i] = 1.0
+        adj_array[-1, :, :] = 1 - np.sum(adj_array, axis=0)
+        if not one_shot:
+            adj_array += np.eye(num_max_node)
+
+        data = Data(x=x)
+        data.adj = th.tensor(adj_array)
+        data.num_atom = num_atom
+        data.y = th.tensor([float(info[1])])
+
+        return data
+
+    def _bfs_seq(self, G, start_id):
+        dictionary = dict(nx.bfs_successors(G, start_id))
+        start = [start_id]
+        output = [start_id]
+        while len(start) > 0:
+            next_vertex = []
+            while len(start) > 0:
+                current = start.pop(0)
+                neighbor = dictionary.get(current)
+                if neighbor is not None:
+                    next_vertex = next_vertex + neighbor
+            output = output + next_vertex
+            start = next_vertex
+        return output

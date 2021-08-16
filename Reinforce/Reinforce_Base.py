@@ -13,13 +13,17 @@ from ogb.utils import smiles2graph
 from pytoda.transforms import LeftPadding, ToTensor
 from pytoda.proteins.protein_language import ProteinLanguage
 from pytoda.smiles.smiles_language import SMILESLanguage
+from ogb.utils import smiles2graph
 
 from Utility.utils import dgl_graph, get_fingerprints, EmbedProt
 from Utility.data_utils import ProteinDataset
+from Utility.utils import dgl_graph, get_fingerprints
+from Utility.layers import EmbedProt
 from ChemVAE.ChemVAE_Module import ChemVAE_Module
 from ProtVAE.ProtVAE_Module import ProtVAE_Module
 from EFA_DTI.EFA_DTI_Module import EFA_DTI_Module
 from Predictor.PredictorBA_Module import PredictorBA_Module
+from EFA_DTI.EFA_DTI_Module import EFA_DTI_Module
 from Utility.drug_evaluators import (
     AromaticRing,
     QED,
@@ -665,6 +669,19 @@ class Reinforce_Base(pl.LightningModule):
         )
         return pred.detach().squeeze()
 
+    def get_reward_ic50(self, valid_smiles, protein):
+        # graphs
+        graphs = [smiles2graph(smiles) for smiles in valid_smiles]
+        graphs = th.cat([dgl_graph(g) for g in graphs], dim=0)
+        # fingerprints
+        mols = [Chem.MolFromSmiles(smiles) for smiles in valid_smiles]
+        fps = th.as_tensor(get_fingerprints(mols), dtype=th.long).unsqueeze(0)
+        # prottrans
+        pemb = EmbedProt()
+        prottrans = th.as_tensor(pemb(protein), dtype=th.float32).unsqueeze(0)
+        # predict
+        pred = self.predictor(graphs, fps, prottrans)
+
     def get_reward_dti(self, mol_list: Union[List[Chem.Mol], List[str]], protein_name):
         pemb = EmbedProt()
         protein = self.protein_df.loc[protein_name]["Sequence"]
@@ -674,7 +691,7 @@ class Reinforce_Base(pl.LightningModule):
         g = th.cat(
             [th.unsqueeze(dgl_graph(smiles2graph(mol)), 0) for mol in mol_list], dim=0
         ).to(self.device)
-        fp = th.to_tensor(get_fingerprints(mol_list), dtype=th.int8, device=self.device)
+        fp = th.as_tensor(get_fingerprints(mol_list), dtype=th.int8, device=self.device)
         pt = pemb(protein, device=self.device).repeat(g.shape[0], 1)
 
         pred = self.predictor(g, fp, pt)

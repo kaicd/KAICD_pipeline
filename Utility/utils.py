@@ -7,7 +7,9 @@ import math
 from tqdm import tqdm
 from math import ceil, cos, sin
 from typing import Union, Tuple
+from joblib import Parallel, cpu_count, delayed
 
+import dgl
 import numpy as np
 import pandas as pd
 import torch as th
@@ -783,6 +785,15 @@ class EmbedProt:
             rest = emb[1:]
             embs.append(np.concatenate([cls, rest]))
         return embs
+
+
+def pmap(fn, data, n_jobs=lambda cpus: cpus // 6, verbose=1, **kwargs):
+    if not isinstance(n_jobs, int):
+        n_jobs = n_jobs(cpu_count())
+
+    return Parallel(n_jobs=n_jobs, verbose=verbose)(
+        delayed(fn)(d, **kwargs) for d in data
+    )
 
 
 class Squeeze(nn.Module):
