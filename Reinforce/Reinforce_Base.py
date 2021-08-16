@@ -2,19 +2,23 @@
 import json
 import os
 import argparse
+from typing import Union, List
 
 import torch as th
 import pandas as pd
 import numpy as np
 import pytorch_lightning as pl
 from rdkit import Chem
+from ogb.utils import smiles2graph
 from pytoda.transforms import LeftPadding, ToTensor
 from pytoda.proteins.protein_language import ProteinLanguage
 from pytoda.smiles.smiles_language import SMILESLanguage
 
+from Utility.utils import dgl_graph, get_fingerprints, EmbedProt
 from Utility.data_utils import ProteinDataset
 from ChemVAE.ChemVAE_Module import ChemVAE_Module
 from ProtVAE.ProtVAE_Module import ProtVAE_Module
+from EFA_DTI.EFA_DTI_Module import EFA_DTI_Module
 from Predictor.PredictorBA_Module import PredictorBA_Module
 from Utility.drug_evaluators import (
     AromaticRing,
@@ -209,25 +213,26 @@ class Reinforce_Base(pl.LightningModule):
             chem_smiles_language_path,
         )
         self.decoder._associate_language(decoder_smiles_language)
-        # Restore affinity predictor
-        self.predictor = PredictorBA_Module.load_from_checkpoint(
-            pred_model_path,
-            params_filepath=pred_model_params_path,
-        )
-        # Load smiles and protein languages for predictor
-        predictor_smiles_language = SMILESLanguage.load(pred_smiles_language_path)
-        predictor_protein_language = ProteinLanguage.load(pred_protein_language_path)
-        self.predictor._associate_language(predictor_smiles_language)
-        self.predictor._associate_language(predictor_protein_language)
-        # Set padding parameters
-        self.pad_smiles_predictor = LeftPadding(
-            self.predictor.smiles_padding_length,
-            self.predictor.smiles_language.padding_index,
-        )
-        self.pad_protein_predictor = LeftPadding(
-            self.predictor.protein_padding_length,
-            self.predictor.protein_language.padding_index,
-        )
+        # # Restore affinity predictor
+        # self.predictor = PredictorBA_Module.load_from_checkpoint(
+        #     pred_model_path,
+        #     params_filepath=pred_model_params_path,
+        # )
+        # # Load smiles and protein languages for predictor
+        # predictor_smiles_language = SMILESLanguage.load(pred_smiles_language_path)
+        # predictor_protein_language = ProteinLanguage.load(pred_protein_language_path)
+        # self.predictor._associate_language(predictor_smiles_language)
+        # self.predictor._associate_language(predictor_protein_language)
+        # # Set padding parameters
+        # self.pad_smiles_predictor = LeftPadding(
+        #     self.predictor.smiles_padding_length,
+        #     self.predictor.smiles_language.padding_index,
+        # )
+        # self.pad_protein_predictor = LeftPadding(
+        #     self.predictor.protein_padding_length,
+        #     self.predictor.protein_language.padding_index,
+        # )
+        self.predictor = EFA_DTI_Module.load_from_checkpoint(pred_model_path)
         # Load protein sequence data for protein test name
         protein_dataset = ProteinDataset(
             project_path + protein_data_path, test_protein_id
@@ -631,7 +636,7 @@ class Reinforce_Base(pl.LightningModule):
         # This is the joint reward function. Each score is normalized to be
         # inside the range [0, 1].
         self.reward_fn = lambda smiles, protein: (
-            self.affinity_weight * self.get_reward_affinity(smiles, protein)
+            self.affinity_weight * self.get_reward_dti(smiles, protein)
             + th.Tensor([tox_f(s) for s in smiles]).to(self.device)
         )
 
@@ -658,4 +663,19 @@ class Reinforce_Base(pl.LightningModule):
         pred, pred_dict = self.predictor(
             smiles_tensor, protein_tensor.repeat(smiles_tensor.shape[0], 1)
         )
+        return pred.detach().squeeze()
+
+    def get_reward_dti(self, mol_list: Union[List[Chem.Mol], List[str]], protein_name):
+        pemb = EmbedProt()
+        protein = self.protein_df.loc[protein_name]["Sequence"]
+        if isinstance(mol_list[0], str):
+            mol_list = [Chem.MolFromSmiles(mol) for mol in mol_list]
+
+        g = th.cat(
+            [th.unsqueeze(dgl_graph(smiles2graph(mol)), 0) for mol in mol_list], dim=0
+        ).to(self.device)
+        fp = th.to_tensor(get_fingerprints(mol_list), dtype=th.int8, device=self.device)
+        pt = pemb(protein, device=self.device).repeat(g.shape[0], 1)
+
+        pred = self.predictor(g, fp, pt)
         return pred.detach().squeeze()

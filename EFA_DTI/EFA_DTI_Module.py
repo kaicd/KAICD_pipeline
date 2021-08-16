@@ -55,17 +55,17 @@ class EFA_DTI_Module(pl.LightningModule):
         )
         self.output = MLP_IC(outd, *output_dims, dropout=dropout, act=act)
 
-    def forward(self, smiles, protein):
+    def forward(self, g, fp, pt):
         mol = self.mol_enc(g)
         molfp = self.fingerprint_enc(fp)
-        prottrans = self.prottrans_enc(prottrans)
+        prottrans = self.prottrans_enc(pt)
 
         return self.output(th.cat([mol, molfp, prottrans], -1))
 
     def training_step(self, batch, _=None):
         y = batch[-1]
-        g, fp, seq, aadc, prottrans, _ = batch
-        yhat = self(g, fp, prottrans).squeeze()
+        g, fp, seq, aadc, pt, _ = batch
+        yhat = self(g, fp, pt).squeeze()
         mse = F.mse_loss(yhat, y)
         self.log("train_mse", mse)
         return mse
