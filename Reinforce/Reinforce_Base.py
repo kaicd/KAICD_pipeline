@@ -374,7 +374,7 @@ class Reinforce_Base(pl.LightningModule):
         # This is the joint reward function. Each score is normalized to be
         # inside the range [0, 1].
         self.reward_fn = lambda smiles, protein: (
-            self.affinity_weight * self.get_reward_affinity(smiles, protein)
+            self.affinity_weight * self.get_reward_dti(smiles, protein)
             + th.Tensor([tox_f(s) for s in smiles]).to(self.device)
         )
         # discount factor
