@@ -13,7 +13,7 @@ class SIDER(DrugEvaluator):
     """
 
     def __init__(
-        self, project_path: str, params_path: str, model_path: str, device: torch.device
+        self, params_path: str, model_path: str, device: torch.device
     ):
         """
 
@@ -23,7 +23,7 @@ class SIDER(DrugEvaluator):
 
         super(SIDER, self).__init__()
         self.device = device
-        self.load_mca(project_path, params_path, model_path)
+        self.load_mca(params_path, model_path)
 
     def __call__(self, smiles: str) -> float:
         """

@@ -87,7 +87,6 @@ class OrganDB(DrugEvaluator):
 
     def __init__(
         self,
-        project_path: str,
         params_path: str,
         model_path: str,
         site: str,
@@ -111,7 +110,7 @@ class OrganDB(DrugEvaluator):
 
         super(OrganDB, self).__init__()
         self.device = device
-        self.load_mca(project_path, params_path, model_path)
+        self.load_mca(params_path, model_path)
         self.set_reward_fn(site, toxicity_type, reward_type)
 
     def set_reward_fn(self, site: str, toxicity_type: str, reward_type: str):

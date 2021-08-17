@@ -1,9 +1,11 @@
 """PaccMann^RL: Policy gradient class"""
 import json
 import os
+import pickle
 import argparse
 from typing import Union, List
 
+import dgl
 import torch as th
 import pandas as pd
 import numpy as np
@@ -68,6 +70,12 @@ class Reinforce_Base(pl.LightningModule):
             default="Predictor/checkpoint/",
         )
         parser.add_argument(
+            "--predEFA_model_path",
+            type=str,
+            help="Path to pretrained affinity model",
+            default="EFA_DTI/checkpoint/",
+        )
+        parser.add_argument(
             "--params_path",
             type=str,
             help="Model params json file directory",
@@ -116,6 +124,11 @@ class Reinforce_Base(pl.LightningModule):
             default="data/training/unbiased_predictions",
         )
         parser.add_argument(
+            "--merged_sequence_encoding_path",
+            type=str,
+            default="data/training/merged_sequence_encoding",
+        )
+        parser.add_argument(
             "--tox21_path",
             type=str,
             help="Optional path to Tox21 model.",
@@ -152,6 +165,7 @@ class Reinforce_Base(pl.LightningModule):
         chem_model_path,
         prot_model_path,
         pred_model_path,
+        predEFA_model_path,
         protein_data_path,
         params_path,
         chem_model_params_path,
@@ -163,6 +177,7 @@ class Reinforce_Base(pl.LightningModule):
         test_protein_id,
         model_name,
         unbiased_predictions_path,
+        merged_sequence_encoding_path,
         result_filepath,
         tox21_path=None,
         organdb_path=None,
@@ -197,7 +212,7 @@ class Reinforce_Base(pl.LightningModule):
         for (args, kwargs) in optional_rewards:
             if args:
                 # json still has presedence
-                self.params[kwargs] = project_path + args
+                self.params[kwargs] = args
         # Restore ProtVAE model
         protein_model = ProtVAE_Module.load_from_checkpoint(
             prot_model_path,
@@ -217,31 +232,38 @@ class Reinforce_Base(pl.LightningModule):
             chem_smiles_language_path,
         )
         self.decoder._associate_language(decoder_smiles_language)
-        # # Restore affinity predictor
-        # self.predictor = PredictorBA_Module.load_from_checkpoint(
-        #     pred_model_path,
-        #     params_filepath=pred_model_params_path,
-        # )
-        # # Load smiles and protein languages for predictor
-        # predictor_smiles_language = SMILESLanguage.load(pred_smiles_language_path)
-        # predictor_protein_language = ProteinLanguage.load(pred_protein_language_path)
-        # self.predictor._associate_language(predictor_smiles_language)
-        # self.predictor._associate_language(predictor_protein_language)
-        # # Set padding parameters
-        # self.pad_smiles_predictor = LeftPadding(
-        #     self.predictor.smiles_padding_length,
-        #     self.predictor.smiles_language.padding_index,
-        # )
-        # self.pad_protein_predictor = LeftPadding(
-        #     self.predictor.protein_padding_length,
-        #     self.predictor.protein_language.padding_index,
-        # )
-        self.predictor = EFA_DTI_Module.load_from_checkpoint(pred_model_path)
+        # Restore affinity predictor
+        self.predictor = PredictorBA_Module.load_from_checkpoint(
+            pred_model_path,
+            params_filepath=pred_model_params_path,
+        )
+        # Load smiles and protein languages for predictor
+        predictor_smiles_language = SMILESLanguage.load(pred_smiles_language_path)
+        predictor_protein_language = ProteinLanguage.load(pred_protein_language_path)
+        self.predictor._associate_language(predictor_smiles_language)
+        self.predictor._associate_language(predictor_protein_language)
+        # Set padding parameters
+        self.pad_smiles_predictor = LeftPadding(
+            self.predictor.smiles_padding_length,
+            self.predictor.smiles_language.padding_index,
+        )
+        self.pad_protein_predictor = LeftPadding(
+            self.predictor.protein_padding_length,
+            self.predictor.protein_language.padding_index,
+        )
+
+        self.predictorEFA = EFA_DTI_Module.load_from_checkpoint(predEFA_model_path)
         # Load protein sequence data for protein test name
         protein_dataset = ProteinDataset(
             project_path + protein_data_path, test_protein_id
         )
         self.protein_df = protein_dataset.origin_protein_df
+        prottrans_path = os.path.join(
+            project_path + merged_sequence_encoding_path,
+            "uniprot_covid-19_prottrans.pkl",
+        )
+        with open(prottrans_path, "rb") as f:
+            self.prottrans_enc = pickle.load(f)
         # Specifies the baseline model used for comparison
         self.protein_test_name = self.protein_df.iloc[test_protein_id].name
         self.unbiased_preds = np.array(
@@ -308,7 +330,6 @@ class Reinforce_Base(pl.LightningModule):
         self.tox21_weight = params.get("tox21_weight", 0.5)
         if self.tox21_weight > 0.0:
             self.tox21 = Tox21(
-                project_path=self.project_path,
                 params_path="Config/Toxicity.json",
                 model_path=params.get("tox21_path", ""),
                 device=self.device,
@@ -320,7 +341,6 @@ class Reinforce_Base(pl.LightningModule):
         self.organdb_weight = params.get("organdb_weight", 0.0)
         if self.organdb_weight > 0.0:
             self.organdb = OrganDB(
-                self.project_path,
                 params_path="Config/Toxicity.json",
                 model_path=params.get("organdb_path", ""),
                 site=params["site"],
@@ -332,7 +352,6 @@ class Reinforce_Base(pl.LightningModule):
         self.clintox_weight = params.get("clintox_weight", 0.0)
         if self.clintox_weight > 0.0:
             self.clintox = ClinTox(
-                project_path=self.project_path,
                 params_path="Config/Toxicity.json",
                 model_path=params.get("clintox_path", ""),
                 device=self.device,
@@ -343,7 +362,6 @@ class Reinforce_Base(pl.LightningModule):
         self.sider_weight = params.get("sider_weight", 0.0)
         if self.sider_weight > 0.0:
             self.sider = SIDER(
-                self.project_path,
                 params_path="Config/Toxicity.json",
                 model_path=params.get("sider_path", ""),
                 device=self.device,
@@ -384,9 +402,7 @@ class Reinforce_Base(pl.LightningModule):
         # discount factor
         self.gamma = params.get("gamma", 0.99)
         # maximal length of generated molecules
-        self.generate_len = params.get(
-            "generate_len", self.predictor.params["smiles_padding_length"] - 2
-        )
+        self.generate_len = params.get("generate_len", 100)
         # smoothing factor for softmax during token sampling in decoder
         self.temperature = params.get("temperature", 0.8)
         # gradient clipping in decoder
@@ -669,30 +685,15 @@ class Reinforce_Base(pl.LightningModule):
         )
         return pred.detach().squeeze()
 
-    def get_reward_ic50(self, valid_smiles, protein):
-        # graphs
-        graphs = [smiles2graph(smiles) for smiles in valid_smiles]
-        graphs = th.cat([dgl_graph(g) for g in graphs], dim=0)
-        # fingerprints
-        mols = [Chem.MolFromSmiles(smiles) for smiles in valid_smiles]
-        fps = th.as_tensor(get_fingerprints(mols), dtype=th.long).unsqueeze(0)
-        # prottrans
-        pemb = EmbedProt()
-        prottrans = th.as_tensor(pemb(protein), dtype=th.float32).unsqueeze(0)
-        # predict
-        pred = self.predictor(graphs, fps, prottrans)
-
     def get_reward_dti(self, mol_list: Union[List[Chem.Mol], List[str]], protein_name):
-        pemb = EmbedProt()
-        protein = self.protein_df.loc[protein_name]["Sequence"]
-        if isinstance(mol_list[0], str):
-            mol_list = [Chem.MolFromSmiles(mol) for mol in mol_list]
+        if isinstance(mol_list[0], Chem.Mol):
+            mol_list = [Chem.MolToSmiles(mol) for mol in mol_list]
 
-        g = th.cat(
-            [th.unsqueeze(dgl_graph(smiles2graph(mol)), 0) for mol in mol_list], dim=0
-        ).to(self.device)
-        fp = th.as_tensor(get_fingerprints(mol_list), dtype=th.int8, device=self.device)
-        pt = pemb(protein, device=self.device).repeat(g.shape[0], 1)
+        g = dgl.batch([dgl_graph(smiles2graph(mol)) for mol in mol_list]).to(self.device)
+        fp = th.as_tensor(get_fingerprints(mol_list), dtype=th.float32, device=self.device)
+        pt = th.as_tensor(
+            self.prottrans_enc[protein_name], dtype=th.float32, device=self.device
+        ).repeat(len(mol_list), 1)
 
-        pred = self.predictor(g, fp, pt)
+        pred = self.predictorEFA(g, fp, pt)
         return pred.detach().squeeze()

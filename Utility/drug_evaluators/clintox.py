@@ -14,7 +14,6 @@ class ClinTox(DrugEvaluator):
 
     def __init__(
         self,
-        project_path: str,
         params_path: str,
         model_path: str,
         device: torch.device,
@@ -32,7 +31,7 @@ class ClinTox(DrugEvaluator):
         """
 
         super(ClinTox, self).__init__()
-        self.load_mca(project_path, params_path, model_path)
+        self.load_mca(params_path, model_path)
 
         self.set_reward_fn(reward_type)
 

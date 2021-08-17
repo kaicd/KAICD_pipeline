@@ -60,7 +60,7 @@ data = Reinforce_DataModule(**vars(args))
 # Define pytorch_lightning Trainer
 wandb_group = "OTHER"
 group_list = ["HUMAN", "SARS2", "CVHSA", "OTHER"]
-protein_df = pd.read_csv(args.protein_data_path, index_col="entry_name")
+protein_df = pd.read_csv(args.project_path + args.protein_data_path, index_col="entry_name")
 wandb_name = protein_df.index[args.test_protein_id]
 for group in group_list:
     if group in wandb_name:
