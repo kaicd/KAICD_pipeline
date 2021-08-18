@@ -3,7 +3,6 @@ import json
 import os
 import pickle
 import argparse
-from typing import Union, List
 
 import dgl
 import torch as th
@@ -11,21 +10,17 @@ import pandas as pd
 import numpy as np
 import pytorch_lightning as pl
 from rdkit import Chem
-from ogb.utils import smiles2graph
 from pytoda.transforms import LeftPadding, ToTensor
 from pytoda.proteins.protein_language import ProteinLanguage
 from pytoda.smiles.smiles_language import SMILESLanguage
 from ogb.utils import smiles2graph
 
-from Utility.utils import dgl_graph, get_fingerprints, EmbedProt
 from Utility.data_utils import ProteinDataset
 from Utility.utils import dgl_graph, get_fingerprints
-from Utility.layers import EmbedProt
 from ChemVAE.ChemVAE_Module import ChemVAE_Module
 from ProtVAE.ProtVAE_Module import ProtVAE_Module
-from EFA_DTI.EFA_DTI_Module import EFA_DTI_Module
 from Predictor.PredictorBA_Module import PredictorBA_Module
-from EFA_DTI.EFA_DTI_Module import EFA_DTI_Module
+from Predictor.PredictorEFA_Module import PredictorEFA_Module
 from Utility.drug_evaluators import (
     AromaticRing,
     QED,
@@ -70,12 +65,6 @@ class Reinforce_Base(pl.LightningModule):
             default="Predictor/checkpoint/",
         )
         parser.add_argument(
-            "--predEFA_model_path",
-            type=str,
-            help="Path to pretrained affinity model",
-            default="EFA_DTI/checkpoint/",
-        )
-        parser.add_argument(
             "--params_path",
             type=str,
             help="Model params json file directory",
@@ -116,6 +105,11 @@ class Reinforce_Base(pl.LightningModule):
             type=str,
             help="Prediction model params json file directory",
             default="Config/PredictorBA_protein_language.pkl",
+        )
+        parser.add_argument(
+            "--predictor_model_name",
+            type=str,
+            default="EFA",
         )
         parser.add_argument(
             "--unbiased_predictions_path",
@@ -165,7 +159,6 @@ class Reinforce_Base(pl.LightningModule):
         chem_model_path,
         prot_model_path,
         pred_model_path,
-        predEFA_model_path,
         protein_data_path,
         params_path,
         chem_model_params_path,
@@ -175,7 +168,7 @@ class Reinforce_Base(pl.LightningModule):
         pred_smiles_language_path,
         pred_protein_language_path,
         test_protein_id,
-        model_name,
+        predictor_model_name,
         unbiased_predictions_path,
         merged_sequence_encoding_path,
         result_filepath,
@@ -188,8 +181,8 @@ class Reinforce_Base(pl.LightningModule):
     ):
         super(Reinforce_Base, self).__init__()
         # Default setting
-        self.model_name = model_name
         self.project_path = project_path
+        self.predictor_model_name = predictor_model_name
         # Read the parameters json file
         self.params = dict()
         with open(params_path) as f:
@@ -233,26 +226,27 @@ class Reinforce_Base(pl.LightningModule):
         )
         self.decoder._associate_language(decoder_smiles_language)
         # Restore affinity predictor
-        self.predictor = PredictorBA_Module.load_from_checkpoint(
-            pred_model_path,
-            params_filepath=pred_model_params_path,
-        )
-        # Load smiles and protein languages for predictor
-        predictor_smiles_language = SMILESLanguage.load(pred_smiles_language_path)
-        predictor_protein_language = ProteinLanguage.load(pred_protein_language_path)
-        self.predictor._associate_language(predictor_smiles_language)
-        self.predictor._associate_language(predictor_protein_language)
-        # Set padding parameters
-        self.pad_smiles_predictor = LeftPadding(
-            self.predictor.smiles_padding_length,
-            self.predictor.smiles_language.padding_index,
-        )
-        self.pad_protein_predictor = LeftPadding(
-            self.predictor.protein_padding_length,
-            self.predictor.protein_language.padding_index,
-        )
-
-        self.predictorEFA = EFA_DTI_Module.load_from_checkpoint(predEFA_model_path)
+        if self.predictor_model_name == "EFA":
+            self.predictor = PredictorEFA_Module.load_from_checkpoint(pred_model_path)
+        else:
+            self.predictor = PredictorBA_Module.load_from_checkpoint(
+                pred_model_path,
+                params_filepath=pred_model_params_path,
+            )
+            # Load smiles and protein languages for predictor
+            predictor_smiles_language = SMILESLanguage.load(pred_smiles_language_path)
+            predictor_protein_language = ProteinLanguage.load(pred_protein_language_path)
+            self.predictor._associate_language(predictor_smiles_language)
+            self.predictor._associate_language(predictor_protein_language)
+            # Set padding parameters
+            self.pad_smiles_predictor = LeftPadding(
+                self.predictor.smiles_padding_length,
+                self.predictor.smiles_language.padding_index,
+            )
+            self.pad_protein_predictor = LeftPadding(
+                self.predictor.protein_padding_length,
+                self.predictor.protein_language.padding_index,
+            )
         # Load protein sequence data for protein test name
         protein_dataset = ProteinDataset(
             project_path + protein_data_path, test_protein_id
@@ -395,8 +389,14 @@ class Reinforce_Base(pl.LightningModule):
 
         # This is the joint reward function. Each score is normalized to be
         # inside the range [0, 1].
+        self.predictor_fw = (
+            self.get_efa_pred
+            if self.predictor_model_name == "EFA"
+            else self.get_ba_pred
+        )
+
         self.reward_fn = lambda smiles, protein: (
-            self.affinity_weight * self.get_reward_dti(smiles, protein)
+            self.affinity_weight * self.predictor_fw(smiles, protein, score=True)
             + th.Tensor([tox_f(s) for s in smiles]).to(self.device)
         )
         # discount factor
@@ -407,6 +407,32 @@ class Reinforce_Base(pl.LightningModule):
         self.temperature = params.get("temperature", 0.8)
         # gradient clipping in decoder
         self.grad_clipping = params.get("clip_grad", None)
+
+    def update_reward_fn(self, params):
+        """Set the reward function
+        Arguments:
+            params (dict): Hyperparameter for PaccMann reward function
+        """
+        self.affinity_weight = self.params.get("affinity_weight", 1.0)
+
+        def tox_f(s):
+            x = 0
+            if self.tox21_weight > 0.0:
+                x += self.tox21_weight * self.tox21(s)
+            if self.sider_weight > 0.0:
+                x += self.sider_weight * self.sider(s)
+            if self.clintox_weight > 0.0:
+                x += self.clintox_weight * self.clintox(s)
+            if self.organdb_weight > 0.0:
+                x += self.organdb_weight * self.organdb(s)
+            return x
+
+        # This is the joint reward function. Each score is normalized to be
+        # inside the range [0, 1].
+        self.reward_fn = lambda smiles, protein: (
+            self.affinity_weight * self.predictor_fw(smiles, protein, score=True)
+            + th.Tensor([tox_f(s) for s in smiles]).to(self.device)
+        )
 
     def encode_protein(self, protein=None, batch_size=128):
         """
@@ -419,9 +445,7 @@ class Reinforce_Base(pl.LightningModule):
             latent_z = th.randn(1, batch_size, self.encoder.latent_size)
         else:
 
-            protein_tensor, _ = self.protein_to_numerical(
-                protein, encoder_uses_sequence=False
-            )
+            protein_tensor = self.enc_protein_to_numerical(protein)
             protein_mu, protein_logvar = self.encoder(protein_tensor)
 
             latent_z = th.unsqueeze(
@@ -440,7 +464,6 @@ class Reinforce_Base(pl.LightningModule):
         Receives a list of SMILES.
         Converts it to a numerical torch Tensor according to smiles_language
         """
-
         if target == "generator":
             # NOTE: Code for this in the normal REINFORCE class
             raise ValueError("Priming drugs not yet supported")
@@ -462,55 +485,28 @@ class Reinforce_Base(pl.LightningModule):
             smiles_tensor = th.cat(smiles_num, dim=0).to(self.device)
         return smiles_tensor
 
-    def protein_to_numerical(
-        self, protein, encoder_uses_sequence=True, predictor_uses_sequence=True
-    ):
-        """
-        Receives a name of a protein.
-        Returns two numerical torch Tensor, the first for the protein encoder,
-        the second for the affinity predictor.
-        Args:
-            protein (str): Name of the protein
-            encoder_uses_sequence (bool): Whether the encoder uses the protein
-                sequence or an embedding.
-            predictor_uses_sequence (bool): Whether the predictor uses the
-                protein sequence or an embedding.
+    def enc_protein_to_numerical(self, protein):
+        locations = [str(x) for x in range(768)]
+        protein_encoding = self.protein_df.loc[protein][locations]
+        encoding_tensor = th.unsqueeze(th.Tensor(protein_encoding), 0).to(
+            self.device
+        )
+        return encoding_tensor
 
-        """
+    def pred_protein_to_numerical(self, protein):
         protein_to_tensor = ToTensor(self.device)
         protein_sequence = self.protein_df.loc[protein]["Sequence"]
-        if predictor_uses_sequence:
-            sequence_tensor_p = th.unsqueeze(
-                protein_to_tensor(
-                    self.pad_protein_predictor(
-                        self.predictor.protein_language.sequence_to_token_indexes(
-                            protein_sequence
-                        )
+        sequence_tensor_p = th.unsqueeze(
+            protein_to_tensor(
+                self.pad_protein_predictor(
+                    self.predictor.protein_language.sequence_to_token_indexes(
+                        protein_sequence
                     )
-                ),
-                0,
-            ).to(self.device)
-        if encoder_uses_sequence:
-            sequence_tensor_e = th.unsqueeze(
-                protein_to_tensor(
-                    self.pad_protein_predictor(
-                        self.encoder.protein_language.sequence_to_token_indexes(
-                            protein_sequence
-                        )
-                    )
-                ),
-                0,
-            ).to(self.device)
-        if (not encoder_uses_sequence) or (not predictor_uses_sequence):
-            # Column names of DF
-            locations = [str(x) for x in range(768)]
-            protein_encoding = self.protein_df.loc[protein][locations]
-            encoding_tensor = th.unsqueeze(th.Tensor(protein_encoding), 0).to(
-                self.device
-            )
-        t1 = sequence_tensor_e if encoder_uses_sequence else encoding_tensor
-        t2 = sequence_tensor_p if predictor_uses_sequence else encoding_tensor
-        return t1, t2
+                )
+            ),
+            0,
+        ).to(self.device)
+        return sequence_tensor_p
 
     def get_smiles_from_latent(self, latent, remove_invalid=True):
         """
@@ -605,12 +601,9 @@ class Reinforce_Base(pl.LightningModule):
             raise ValueError("Drug priming not yet supported.")
         if protein is None:
             # Generate a random molecule
-            latent_z = th.randn(1, batch_size, self.decoder.latent_dim)
+            latent_z = th.randn(1, batch_size, self.decoder.latent_dim).to(self.device)
         else:
-            (
-                protein_encoder_tensor,
-                protein_predictor_tensor,
-            ) = self.protein_to_numerical(protein, encoder_uses_sequence=False)
+            protein_encoder_tensor = self.enc_protein_to_numerical(protein)
             protein_mu, protein_logvar = self.encoder(protein_encoder_tensor)
             latent_z = th.unsqueeze(
                 # Reparameterize
@@ -618,82 +611,39 @@ class Reinforce_Base(pl.LightningModule):
                 .mul_(th.exp(0.5 * protein_logvar.repeat(batch_size, 1)))
                 .add_(protein_mu.repeat(batch_size, 1)),
                 0,
-            )
-        latent_z = latent_z.to(self.device)
+            ).to(self.device)
         # Generate drugs
         valid_smiles, valid_nums, _ = self.get_smiles_from_latent(
             latent_z, remove_invalid=remove_invalid
         )
-        smiles_t = self.smiles_to_numerical(valid_smiles, target="predictor")
         # Evaluate drugs
-        pred, pred_dict = self.predictor(
-            smiles_t, protein_predictor_tensor.repeat(len(valid_smiles), 1)
-        )
+        pred = self.predictor_fw(valid_smiles, protein)
+
         if return_latent:
             return valid_smiles, pred.detach().squeeze(), latent_z
         else:
             return valid_smiles, pred
 
-    def update_reward_fn(self, params):
-        """Set the reward function
-        Arguments:
-            params (dict): Hyperparameter for PaccMann reward function
-        """
-        self.affinity_weight = self.params.get("affinity_weight", 1.0)
-
-        def tox_f(s):
-            x = 0
-            if self.tox21_weight > 0.0:
-                x += self.tox21_weight * self.tox21(s)
-            if self.sider_weight > 0.0:
-                x += self.sider_weight * self.sider(s)
-            if self.clintox_weight > 0.0:
-                x += self.clintox_weight * self.clintox(s)
-            if self.organdb_weight > 0.0:
-                x += self.organdb_weight * self.organdb(s)
-            return x
-
-        # This is the joint reward function. Each score is normalized to be
-        # inside the range [0, 1].
-        self.reward_fn = lambda smiles, protein: (
-            self.affinity_weight * self.get_reward_dti(smiles, protein)
-            + th.Tensor([tox_f(s) for s in smiles]).to(self.device)
-        )
-
-    def get_reward_affinity(self, valid_smiles, protein):
-        """
-        Get the reward from affinity predictor
-
-        Args:
-            valid_smiles (list): A list of valid SMILES strings.
-            protein (str): Name of target protein
-
-        Returns:
-            np.array: computed reward (fixed to 1/(1+exp(x))).
-        """
-        # Build up SMILES tensor and GEP tensor
-        smiles_tensor = self.smiles_to_numerical(valid_smiles, target="predictor")
-        # If all SMILES are invalid, no reward is given
-        if len(smiles_tensor) == 0:
+    def get_ba_pred(self, valid_smiles, protein, score=False):
+        if len(valid_smiles) == 0:
             return 0
 
-        _, protein_tensor = self.protein_to_numerical(
-            protein, encoder_uses_sequence=False
-        )
+        smiles_tensor = self.smiles_to_numerical(valid_smiles, target="predictor")
+        protein_tensor = self.pred_protein_to_numerical(protein)
         pred, pred_dict = self.predictor(
             smiles_tensor, protein_tensor.repeat(smiles_tensor.shape[0], 1)
         )
-        return pred.detach().squeeze()
+        return pred.detach().sequeeze() if score else pred
 
-    def get_reward_dti(self, mol_list: Union[List[Chem.Mol], List[str]], protein_name):
-        if isinstance(mol_list[0], Chem.Mol):
-            mol_list = [Chem.MolToSmiles(mol) for mol in mol_list]
+    def get_efa_pred(self, valid_smiles, protein, score=False):
+        if len(valid_smiles) == 0:
+            return 0
 
-        g = dgl.batch([dgl_graph(smiles2graph(mol)) for mol in mol_list]).to(self.device)
-        fp = th.as_tensor(get_fingerprints(mol_list), dtype=th.float32, device=self.device)
+        g = dgl.batch([dgl_graph(smiles2graph(smiles)) for smiles in valid_smiles]).to(self.device)
+        fp = th.as_tensor(get_fingerprints(valid_smiles), dtype=th.float32, device=self.device)
         pt = th.as_tensor(
-            self.prottrans_enc[protein_name], dtype=th.float32, device=self.device
-        ).repeat(len(mol_list), 1)
+            self.prottrans_enc[protein], dtype=th.float32, device=self.device
+        ).repeat(len(valid_smiles), 1)
 
         pred = self.predictorEFA(g, fp, pt)
-        return pred.detach().squeeze()
+        return 1 / (1 + th.exp(pred.detach().sequeeze())) if score else pred

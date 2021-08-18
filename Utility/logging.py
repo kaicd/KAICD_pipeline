@@ -138,9 +138,9 @@ def plot_and_compare_proteins(
     plt.xlabel("Predicted binding probability")
     plt.ylabel(f"Density of generated molecules")
     t1 = "PaccMann$^{\mathrm{RL}}$ "
-    # protein_name = '_'.join(protein.split('=')[1].split('-')[:-1])
+    # protein = '_'.join(protein.split('=')[1].split('-')[:-1])
     # organism = protein.split('=')[-1]
-    # t2 = f'generator for: {protein_name}\n({organism})'
+    # t2 = f'generator for: {protein}\n({organism})'
     protein_name = protein
     t2 = f"generator for: {protein_name}\n"
     plt.title(t1 + t2, size=10)

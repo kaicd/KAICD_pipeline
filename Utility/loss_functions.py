@@ -1,14 +1,9 @@
 """Loss Functions."""
-import logging
+import math
 from typing import Iterable
 
 import torch
 import torch.nn as nn
-
-from .utils import kl_weight
-
-
-logger = logging.getLogger(__name__)
 
 
 def vae_loss_function(
@@ -70,6 +65,27 @@ def mse_cc_loss(labels, predictions):
     mse_loss = mse_loss_fn(predictions, labels)
     cc_loss = correlation_coefficient_loss(labels, predictions)
     return mse_loss + cc_loss
+
+
+def kl_weight(step, growth_rate=0.004):
+    """Kullback-Leibler weighting function.
+
+    KL divergence weighting for better training of
+    encoder and decoder of the VAE.
+
+    Reference:
+        https://arxiv.org/abs/1511.06349
+
+    Args:
+        step (int): The training step.
+        growth_rate (float): The rate at which the weight grows.
+            Defaults to 0.0015 resulting in a weight of 1 around step=9000.
+
+    Returns:
+        float: The weight of KL divergence loss term.
+    """
+    weight = 1 / (1 + math.exp((15 - growth_rate * step)))
+    return weight
 
 
 def kl_divergence_loss(mu, logvar):
@@ -228,7 +244,6 @@ class BCEIgnoreNaN(nn.Module):
             raise ValueError(f"All weigths should be positive not: {class_weights}")
 
         self.class_weights = class_weights
-        logger.info(f"Class weights are {class_weights}.")
 
     def forward(self, yhat: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
         """

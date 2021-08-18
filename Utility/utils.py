@@ -5,23 +5,18 @@ import logging
 import random
 import math
 from tqdm import tqdm
-from math import ceil, cos, sin
+from math import cos, sin
 from typing import Union, Tuple
-from joblib import Parallel, cpu_count, delayed
 
 import dgl
 import numpy as np
-import pandas as pd
 import torch as th
 import torch.nn as nn
 from torch.distributions.normal import Normal
 from torch.distributions.bernoulli import Bernoulli
-from rdkit.Chem.rdchem import BondType
 from rdkit import Chem
 from rdkit.Chem import AllChem, DataStructs
 
-import pytoda
-from pytoda.transforms import Compose
 from transformers import AutoTokenizer, AutoModel, pipeline
 
 logger = logging.getLogger(__name__)
@@ -237,165 +232,6 @@ def manage_step_packed_vars(final_var, var, batch_size, prev_batch, batch_dim):
     return final_var, var
 
 
-def kl_weight(step, growth_rate=0.004):
-    """Kullback-Leibler weighting function.
-
-    KL divergence weighting for better training of
-    encoder and decoder of the VAE.
-
-    Reference:
-        https://arxiv.org/abs/1511.06349
-
-    Args:
-        step (int): The training step.
-        growth_rate (float): The rate at which the weight grows.
-            Defaults to 0.0015 resulting in a weight of 1 around step=9000.
-
-    Returns:
-        float: The weight of KL divergence loss term.
-    """
-    weight = 1 / (1 + math.exp((15 - growth_rate * step)))
-    return weight
-
-
-def to_np(x):
-    return x.data.cpu().numpy()
-
-
-def crop_start_stop(smiles, smiles_language):
-    """
-    Arguments:
-        smiles {th.Tensor} -- Shape 1 x T
-    Returns:
-        smiles {th.Tensor} -- Cropped away everything outside Start/Stop.
-    """
-    smiles = smiles.tolist()
-    try:
-        start_idx = smiles.index(smiles_language.start_index)
-        stop_idx = smiles.index(smiles_language.stop_index)
-        return smiles[start_idx + 1 : stop_idx]
-    except Exception:
-        return smiles
-
-
-def crop_start(smiles, smiles_language):
-    """
-    Arguments:
-        smiles {th.Tensor} -- Shape 1 x T
-    Returns:
-        smiles {th.Tensor} -- Cropped away everything outside Start/Stop.
-    """
-    smiles = smiles.tolist()
-    try:
-        start_idx = smiles.index(smiles_language.start_index)
-        return smiles[start_idx + 1 :]
-    except Exception:
-        return smiles
-
-
-def print_example_reconstruction(
-    reconstruction, inp, language, selfies=False, crop_stop=True
-):
-    """[summary]
-
-    Arguments:
-        reconstruction {[type]} -- [description]
-        inp {[type]} -- [description]
-        language -- SMILES or ProteinLanguage object
-    Raises:
-        TypeError: [description]
-
-    Returns:
-        [type] -- [description]
-    """
-    if isinstance(language, pytoda.smiles.SMILESLanguage):
-        _fn = language.token_indexes_to_smiles
-        if selfies:
-            _fn = Compose([_fn, language.selfies_to_smiles])
-    elif isinstance(language, pytoda.proteins.ProteinLanguage):
-        _fn = language.token_indexes_to_sequence
-    else:
-        raise TypeError(f"Unknown language class: {type(language)}")
-
-    sample_idx = np.random.randint(len(reconstruction))
-
-    if crop_stop:
-        reconstructed = crop_start_stop(reconstruction[sample_idx], language)
-    else:
-        reconstructed = crop_start(reconstruction[sample_idx], language)
-
-    # In padding mode input is tensor
-    if isinstance(inp, th.Tensor):
-        inp = inp.permute(1, 0)
-    elif not isinstance(inp, list):
-        raise TypeError(f"Unknown input type {type(inp)}")
-    sample = inp[sample_idx].tolist()
-
-    pred = _fn(reconstructed)
-    target = _fn(sample)
-
-    return target, pred
-
-
-def add_avg_profile(omics_df):
-    """
-    To the DF of omics data, an average profile of each cancer site is added so
-    as to enable a 'precision medicine regime' in which PaccMann^RL is tuned
-    on the average of all profiles of a site.
-    """
-    # Create and append avg cell profiles
-    omics_df_n = omics_df
-    for site in set(omics_df["site"]):
-
-        omics_df_n = omics_df_n.append(
-            {
-                "cell_line": site + "_avg",
-                "cosmic_id": "avg",
-                "histology": "avg",
-                "site": site + "_avg",
-                "gene_expression": pd.Series(
-                    np.mean(
-                        np.stack(
-                            omics_df[
-                                omics_df["site"] == site  # yapf: disable
-                            ].gene_expression.values
-                        ),
-                        axis=0,
-                    )
-                ),
-            },
-            ignore_index=True,
-        )
-
-    return omics_df_n
-
-
-def omics_data_splitter(omics_df, site, test_fraction):
-    """
-    Split omics data of cell lines into train and test.
-    Args:
-        omics_df    A pandas df of omics data for cancer cell lines
-        site        The cancer site against which the generator is finetuned
-        test_fraction  The fraction of cell lines in test data
-
-    Returns:
-        train_cell_lines, test_cell_lines (tuple): A tuple of lists with the
-            cell line names used for training and testing
-    """
-    if site != "all":
-        cell_lines = np.array(
-            list(set(omics_df[omics_df["site"] == site]["cell_line"]))
-        )
-    else:
-        cell_lines = np.array(list(set(omics_df["cell_line"])))
-    inds = np.arange(cell_lines.shape[0])
-    np.random.shuffle(inds)
-    test_cell_lines = cell_lines[inds[: ceil(len(cell_lines) * test_fraction)]]
-    train_cell_lines = cell_lines[inds[ceil(len(cell_lines) * test_fraction) :]]
-
-    return train_cell_lines.tolist(), test_cell_lines.tolist()
-
-
 def gaussian_mixture(batchsize, ndim, num_labels=8):
     """Generate gaussian mixture data.
 
@@ -457,129 +293,11 @@ def augment(x, dropout=0.0, sigma=0.0):
     return f(x).add_(Normal(0, sigma).sample(x.shape).to(x.device))
 
 
-def attention_list_to_matrix(coding_tuple, dim=2):
-    """[summary]
-
-    Args:
-        coding_tuple (list((th.Tensor, th.Tensor))): iterable of
-            (outputs, att_weights) tuples coming from the attention function
-        dim (int, optional): The dimension along which expansion takes place to
-            concatenate the attention weights. Defaults to 2.
-
-    Returns:
-        (th.Tensor, th.Tensor): raw_coeff, coeff
-
-        raw_coeff: with the attention weights of all multiheads and
-            convolutional kernel sizes concatenated along the given dimension,
-            by default the last dimension.
-        coeff: where the dimension is collapsed by averaging.
-    """
-    raw_coeff = th.cat([th.unsqueeze(tpl[1], 2) for tpl in coding_tuple], dim=dim)
-    return raw_coeff, th.mean(raw_coeff, dim=dim)
-
-
 def get_log_molar(y, ic50_max=None, ic50_min=None):
     """
     Converts PaccMann predictions from [0,1] to log(micromolar) range.
     """
     return y * (ic50_max - ic50_min) + ic50_min
-
-
-def get_feature_dimensions(params: dict):
-    """
-    Returns dimensions of all node features.
-    """
-    n_atom_types = len(params["atom_types"])
-    n_formal_charge = len(params["formal_charge"])
-    n_numh = int(not params["use_explicit_H"] and not params["ignore_H"]) * len(
-        params["imp_H"]
-    )
-    n_chirality = int(params["use_chirality"]) * len(params["chirality"])
-
-    return n_atom_types, n_formal_charge, n_numh, n_chirality
-
-
-def get_tensor_dimensions(
-    n_atom_types: int,
-    n_formal_charge: int,
-    n_num_h: int,
-    n_chirality: int,
-    n_node_features: int,
-    n_edge_features: int,
-    params: dict,
-):
-    """
-    Returns dimensions for all tensors that describe molecular graphs. Tensor dimensions are
-    `list`s, except for `dim_f_term` which is  simply an `int`. Each element of the lists indicate
-    the corresponding dimension of a particular subgraph matrix (i.e. `nodes`, `f_add`, etc).
-    """
-    max_nodes = params["max_n_nodes"]
-    # define the matrix dimensions as `list`s
-    # first for the graph reps...
-    dim_nodes = [max_nodes, n_node_features]
-    dim_edges = [max_nodes, max_nodes, n_edge_features]
-    # ... then for the APDs
-    if params["use_chirality"]:
-        if params["use_explicit_H"] or params["ignore_H"]:
-            dim_f_add = [
-                params["max_n_nodes"],
-                n_atom_types,
-                n_formal_charge,
-                n_chirality,
-                n_edge_features,
-            ]
-        else:
-            dim_f_add = [
-                params["max_n_nodes"],
-                n_atom_types,
-                n_formal_charge,
-                n_num_h,
-                n_chirality,
-                n_edge_features,
-            ]
-    else:
-        if params["use_explicit_H"] or params["ignore_H"]:
-            dim_f_add = [
-                params["max_n_nodes"],
-                n_atom_types,
-                n_formal_charge,
-                n_edge_features,
-            ]
-        else:
-            dim_f_add = [
-                params["max_n_nodes"],
-                n_atom_types,
-                n_formal_charge,
-                n_num_h,
-                n_edge_features,
-            ]
-    dim_f_conn = [params["max_n_nodes"], n_edge_features]
-    dim_f_term = 1
-
-    return dim_nodes, dim_edges, dim_f_add, dim_f_conn, dim_f_term
-
-
-def get_feature_vector_indices(params: dict) -> list:
-    """
-    Gets the indices of the different segments of the feature vector. The indices are
-    analogous to the lengths of the various segments.
-
-    Returns:
-    -------
-        idc (list) : Contains the indices of the different one-hot encoded segments used in the
-          feature vector representations of nodes in `MolecularGraph`s. These segments are, in
-          order, atom type, formal charge, number of implicit Hs, and chirality.
-    """
-    idc = [params["n_atom_types"], params["n_formal_charge"]]
-
-    # indices corresponding to implicit H's and chirality are optional (below)
-    if not params["use_explicit_H"] and not params["ignore_H"]:
-        idc.append(params["n_imp_H"])
-
-    if params["use_chirality"]:
-        idc.append(params["n_chirality"])
-
-    return np.cumsum(idc).tolist()
 
 
 def normalize_evaluation_metrics(
@@ -657,82 +375,6 @@ def norm(list_of_nums: list) -> list:
     return norm_list_of_nums
 
 
-def one_of_k_encoding(x: Union[str, int], allowable_set: list) -> "generator":
-    """Returns the one-of-k encoding of a value `x` having a range of possible
-    values in `allowable_set`.
-
-    Args:
-      x (str, int) : Value to be one-hot encoded.
-      allowable_set (list) : `list` of all possible values.
-
-    Returns:
-      one_hot_generator (generator) : One-hot encoding. A generator of `int`s.
-    """
-    if x not in set(allowable_set):  # use set for speedup over list
-        raise Exception(
-            f"Input {x} not in allowable set {allowable_set}. Add {x} to allowable "
-            f"set in either a) `features.py` or b) your submission script (`submit.py`) "
-            f"and run again."
-        )
-    one_hot_generator = (int(x == s) for s in allowable_set)
-    return one_hot_generator
-
-
-def update_features(params):
-    update_params = params
-    # define node features
-    n_atom_types, n_formal_charge, n_imp_H, n_chirality = get_feature_dimensions(
-        update_params
-    )
-    node_features = n_atom_types + n_formal_charge + n_imp_H + n_chirality
-    # define edge features
-    bondtype_to_int = {BondType.SINGLE: 0, BondType.DOUBLE: 1, BondType.TRIPLE: 2}
-    if update_params.get("use_aromatic_bonds", True):
-        bondtype_to_int[BondType.AROMATIC] = 3
-    int_to_bondtype = dict(map(reversed, bondtype_to_int.items()))
-    edge_features = len(bondtype_to_int)
-    # define matrix dimensions
-    dim_nodes, dim_edges, dim_f_add, dim_f_conn, dim_f_term = get_tensor_dimensions(
-        n_atom_types,
-        n_formal_charge,
-        n_imp_H,
-        n_chirality,
-        node_features,
-        edge_features,
-        update_params,
-    )
-    len_f_add = np.prod(dim_f_add[:])
-    len_f_add_per_node = np.prod(dim_f_add[1:])
-    len_f_conn = np.prod(dim_f_conn[:])
-    len_f_conn_per_node = np.prod(dim_f_conn[1:])
-    # update params
-    feature_params = {
-        "big_negative": -1e6,
-        "big_positive": 1e6,
-        "bondtype_to_int": bondtype_to_int,
-        "int_to_bondtype": int_to_bondtype,
-        "edge_features": edge_features,
-        "n_atom_types": n_atom_types,
-        "n_formal_charge": n_formal_charge,
-        "n_imp_H": n_imp_H,
-        "n_chirality": n_chirality,
-        "node_features": node_features,
-        "dim_nodes": dim_nodes,
-        "dim_edges": dim_edges,
-        "dim_f_add": dim_f_add,
-        "dim_f_conn": dim_f_conn,
-        "dim_f_term": dim_f_term,
-        "dim_apd": [np.prod(dim_f_add) + np.prod(dim_f_conn) + 1],
-        "len_f_add": len_f_add,
-        "len_f_add_per_node": len_f_add_per_node,
-        "len_f_conn": len_f_conn,
-        "len_f_conn_per_node": len_f_conn_per_node,
-    }
-    update_params.update(feature_params)
-
-    return update_params
-
-
 def dgl_graph(graph, ndatakey="feat", edatakey="feat"):
     g = dgl.graph(tuple(graph["edge_index"]), num_nodes=graph["num_nodes"])
     if graph["edge_feat"] is not None:
@@ -785,15 +427,6 @@ class EmbedProt:
             rest = emb[1:]
             embs.append(np.concatenate([cls, rest]))
         return embs
-
-
-def pmap(fn, data, n_jobs=lambda cpus: cpus // 6, verbose=1, **kwargs):
-    if not isinstance(n_jobs, int):
-        n_jobs = n_jobs(cpu_count())
-
-    return Parallel(n_jobs=n_jobs, verbose=verbose)(
-        delayed(fn)(d, **kwargs) for d in data
-    )
 
 
 class Squeeze(nn.Module):

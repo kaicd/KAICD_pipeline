@@ -9,7 +9,7 @@ from sklearn.metrics import r2_score
 from Utility.layers import MLP_IC, GraphNet
 
 
-class EFA_DTI_Module(pl.LightningModule):
+class PredictorEFA_Module(pl.LightningModule):
     def __init__(
         self,
         mol_dim=196,
@@ -31,7 +31,7 @@ class EFA_DTI_Module(pl.LightningModule):
         eps=1e-16,
         data_dir=None,
     ):
-        super(EFA_DTI_Module, self).__init__()
+        super(PredictorEFA_Module, self).__init__()
         self.save_hyperparameters()
 
         self.mol_enc = GraphNet(

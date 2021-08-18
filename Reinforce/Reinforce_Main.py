@@ -38,7 +38,6 @@ parser.add_argument(
     help="ID of testing protein (LOOCV).",
     default=35,
 )
-parser.add_argument("--model_name", type=str, default="KAICD_RL")
 
 # Trainer args
 parser = pl.Trainer.add_argparse_args(parser)
