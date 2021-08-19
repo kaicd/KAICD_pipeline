@@ -4,10 +4,10 @@ import pytorch_lightning as pl
 from pytorch_lightning import loggers
 from pytorch_lightning.callbacks import ModelCheckpoint
 
-from PredictorDS_Module import PredictorDS_Module
+from PredictorBA_DataModule import PredictorBA_DataModule
 from PredictorBA_Module import PredictorBA_Module
 from PredictorDS_DataModule import PredictorDS_DataModule
-from PredictorBA_DataModule import PredictorBA_DataModule
+from PredictorDS_Module import PredictorDS_Module
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--entity", type=str, default="kaicd")

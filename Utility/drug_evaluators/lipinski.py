@@ -1,9 +1,11 @@
 """Lipinski rule of five evaluator."""
 from collections import namedtuple
+
 import rdkit
 from rdkit import Chem
 from rdkit.Chem import Crippen, Descriptors
 from rdkit.Chem import Lipinski as Lipi
+
 from .drug_evaluator import DrugEvaluator
 
 

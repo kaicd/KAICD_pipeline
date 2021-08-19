@@ -1,17 +1,17 @@
 import json
 
-import torch as th
 import pytorch_lightning as pl
+import torch as th
 from pytoda.smiles.smiles_language import SMILESLanguage
 
+from ChemVAE.StackGRUDecoder import StackGRUDecoder
+from ChemVAE.StackGRUEncoder import StackGRUEncoder
 from Utility.hyperparams import OPTIMIZER_FACTORY
 from Utility.loss_functions import vae_loss_function
 from Utility.utils import (
     packed_sequential_data_preparation,
     sequential_data_preparation,
 )
-from ChemVAE.StackGRUEncoder import StackGRUEncoder
-from ChemVAE.StackGRUDecoder import StackGRUDecoder
 
 
 class ChemVAE_Module(pl.LightningModule):

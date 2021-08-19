@@ -1,12 +1,12 @@
-import json
 import argparse
+import json
 
 import pytorch_lightning as pl
 from pytorch_lightning import loggers
 from pytorch_lightning.callbacks import ModelCheckpoint
 
-from Toxicity_Module import Toxicity_Module
 from Toxicity_DataModule import Toxicity_DataModule
+from Toxicity_Module import Toxicity_Module
 
 parser = argparse.ArgumentParser()
 

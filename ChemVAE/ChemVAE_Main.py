@@ -1,14 +1,13 @@
-import json
 import argparse
+import json
 
 import pytorch_lightning as pl
+from pytoda.smiles.smiles_language import SMILESLanguage
 from pytorch_lightning import loggers
 from pytorch_lightning.callbacks import ModelCheckpoint
-from pytoda.smiles.smiles_language import SMILESLanguage
 
-from ChemVAE_Module import ChemVAE_Module
 from ChemVAE_DataModule import ChemVAE_DataModule
-
+from ChemVAE_Module import ChemVAE_Module
 
 parser = argparse.ArgumentParser()
 # Project args

@@ -5,12 +5,12 @@ import numpy as np
 import pandas as pd
 import torch as th
 import torch.nn.functional as F
+from PIL import Image as pilimg
 from rdkit import Chem
 from wandb import Image, Table
-from PIL import Image as pilimg
 
-from .Reinforce_Base import Reinforce_Base
 from Utility.logging import generate_mols_img, plot_and_compare_proteins
+from .Reinforce_Base import Reinforce_Base
 
 
 class Reinforce_Module(Reinforce_Base):
@@ -123,6 +123,16 @@ class Reinforce_Module(Reinforce_Base):
             "binding_images",
             self.protein_test_name,
         )
+        if not os.path.isdir(self.result_filepath):
+            os.mkdir(self.result_filepath)
+        if not os.path.isdir(os.path.join(self.result_filepath, self.model_name)):
+            os.mkdir(os.path.join(self.result_filepath, self.model_name))
+        if not os.path.isdir(
+            os.path.join(self.result_filepath, self.model_name, "binding_images")
+        ):
+            os.mkdir(
+                os.path.join(self.result_filepath, self.model_name, "binding_images")
+            )
         if not os.path.isdir(img_save_path):
             os.mkdir(img_save_path)
         plot_and_compare_proteins(

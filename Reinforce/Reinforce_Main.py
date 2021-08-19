@@ -1,14 +1,13 @@
-import json
 import argparse
+import json
 
 import pandas as pd
 import pytorch_lightning as pl
 from pytorch_lightning import loggers
 from pytorch_lightning.callbacks import ModelCheckpoint
 
-from Reinforce.Reinforce_Module import Reinforce_Module
 from Reinforce.Reinforce_DataModule import Reinforce_DataModule
-
+from Reinforce.Reinforce_Module import Reinforce_Module
 
 parser = argparse.ArgumentParser()
 
@@ -59,7 +58,9 @@ data = Reinforce_DataModule(**vars(args))
 # Define pytorch_lightning Trainer
 wandb_group = "OTHER"
 group_list = ["HUMAN", "SARS2", "CVHSA", "OTHER"]
-protein_df = pd.read_csv(args.project_path + args.protein_data_path, index_col="entry_name")
+protein_df = pd.read_csv(
+    args.project_path + args.protein_data_path, index_col="entry_name"
+)
 wandb_name = protein_df.index[args.test_protein_id]
 for group in group_list:
     if group in wandb_name:

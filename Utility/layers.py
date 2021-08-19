@@ -1,20 +1,20 @@
 """Custom layers implementation."""
-import re
 import math
-from tqdm import tqdm
-from typing import Callable
+import re
 from collections import OrderedDict
+from typing import Callable
 
 import dgl
 import dgl.function as fn
-from dgl.ops import edge_softmax
-from dgl.backend.pytorch.sparse import _gsddmm, _gspmm, gspmm, gsddmm
 import numpy as np
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
+from dgl.backend.pytorch.sparse import _gsddmm, _gspmm, gspmm, gsddmm
+from dgl.ops import edge_softmax
 from einops import rearrange
 from ogb.graphproppred.mol_encoder import AtomEncoder, BondEncoder
+from tqdm import tqdm
 from transformers import AutoTokenizer, AutoModel, pipeline
 
 from .utils import Squeeze, Temperature
@@ -715,8 +715,12 @@ class EmbedProt:
         self.model = AutoModel.from_pretrained("Rostlab/prot_bert_bfd")
 
     def __call__(self, proteins, device=0):
-        fe = pipeline("feature-extraction", model=self.model,
-                      tokenizer=self.tokenizer, device=device)
+        fe = pipeline(
+            "feature-extraction",
+            model=self.model,
+            tokenizer=self.tokenizer,
+            device=device,
+        )
         seqs = [" ".join(list(x)) for x in proteins]
         seqs = [re.sub(r"[UZOB]", "X", sequence) for sequence in seqs]
         embs = []

@@ -1,7 +1,7 @@
-import yaml
-import subprocess
 import argparse
+import subprocess
 
+import yaml
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--model", type=str, default="Reinforce")

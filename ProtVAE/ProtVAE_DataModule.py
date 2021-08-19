@@ -1,12 +1,12 @@
 import json
-import dill
 import os.path as osp
 from argparse import ArgumentParser
 from typing import Optional, Union, Dict, List
 
+import dill
 import pytorch_lightning as pl
-from torch.utils.data.dataloader import DataLoader
 from pytoda.datasets._csv_eager_dataset import _CsvEagerDataset
+from torch.utils.data.dataloader import DataLoader
 
 
 class ProtVAE_DataModule(pl.LightningDataModule):

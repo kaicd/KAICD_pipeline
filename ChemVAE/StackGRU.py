@@ -4,9 +4,8 @@ import logging
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.autograd import Variable
 from pytoda.smiles import SMILESLanguage
-
+from torch.autograd import Variable
 
 logger = logging.getLogger("stack_gru")
 

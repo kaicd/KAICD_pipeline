@@ -3,14 +3,13 @@ import pickle
 from collections import OrderedDict
 from typing import Tuple
 
+import pytorch_lightning as pl
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
-import pytorch_lightning as pl
 from sklearn.metrics import (
     auc,
     average_precision_score,
-    precision_recall_curve,
     roc_curve,
 )
 

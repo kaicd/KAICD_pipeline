@@ -12,9 +12,7 @@ class SIDER(DrugEvaluator):
     Model predicts 27 classes
     """
 
-    def __init__(
-        self, params_path: str, model_path: str, device: torch.device
-    ):
+    def __init__(self, params_path: str, model_path: str, device: torch.device):
         """
 
         Arguments:

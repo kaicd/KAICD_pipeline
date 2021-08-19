@@ -7,8 +7,8 @@ import rdkit
 from rdkit import Chem
 from rdkit.Chem import rdMolDescriptors
 
-from .drug_evaluator import DrugEvaluator
 from Utility.io import get_file
+from .drug_evaluator import DrugEvaluator
 
 
 class SAS(DrugEvaluator):

@@ -1,6 +1,7 @@
 """ClinTox evaluator."""
-from .drug_evaluator import DrugEvaluator
 import torch
+
+from .drug_evaluator import DrugEvaluator
 
 
 class ClinTox(DrugEvaluator):

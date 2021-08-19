@@ -2,14 +2,15 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from .search import SamplingSearch, GreedySearch, BeamSearch
-from .utils import gaussian_mixture
+
 from .loss_functions import (
     mse_cc_loss,
     correlation_coefficient_loss,
     kl_divergence_loss,
     BCEIgnoreNaN,
 )
+from .search import SamplingSearch, GreedySearch, BeamSearch
+from .utils import gaussian_mixture
 
 SEARCH_FACTORY = {
     "sampling": SamplingSearch,

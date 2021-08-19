@@ -1,10 +1,8 @@
 """Utilities functions."""
-import re
 import copy
 import logging
 import random
-import math
-from tqdm import tqdm
+import re
 from math import cos, sin
 from typing import Union, Tuple
 
@@ -12,11 +10,11 @@ import dgl
 import numpy as np
 import torch as th
 import torch.nn as nn
-from torch.distributions.normal import Normal
-from torch.distributions.bernoulli import Bernoulli
 from rdkit import Chem
 from rdkit.Chem import AllChem, DataStructs
-
+from torch.distributions.bernoulli import Bernoulli
+from torch.distributions.normal import Normal
+from tqdm import tqdm
 from transformers import AutoTokenizer, AutoModel, pipeline
 
 logger = logging.getLogger(__name__)

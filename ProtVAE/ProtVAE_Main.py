@@ -4,8 +4,8 @@ import pytorch_lightning as pl
 from pytorch_lightning import loggers
 from pytorch_lightning.callbacks import ModelCheckpoint
 
-from ProtVAE_Module import ProtVAE_Module
 from ProtVAE_DataModule import ProtVAE_DataModule
+from ProtVAE_Module import ProtVAE_Module
 
 parser = argparse.ArgumentParser()
 

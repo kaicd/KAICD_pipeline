@@ -1,6 +1,7 @@
+from typing import Optional, Union, List, Dict
+
 import pytorch_lightning as pl
 from torch.utils.data.dataloader import DataLoader
-from typing import Optional, Union, List, Dict
 
 from Utility.data_utils import ProteinDataset
 

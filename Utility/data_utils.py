@@ -1,8 +1,8 @@
 """Utilities functions."""
 import pandas as pd
 import torch as th
-from torch.utils.data import Dataset
 from pytoda.files import read_smi
+from torch.utils.data import Dataset
 
 
 class ProteinDataset(Dataset):

@@ -1,22 +1,22 @@
 # load general packages and functions
-import os
 import csv
+import os
 from collections import namedtuple
-from typing import Union, Tuple
+from typing import Tuple
 from warnings import filterwarnings
 
-import torch as th
+import matplotlib.patches as mpatches
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import rdkit
+import rdkit.RDLogger as rkl
+import rdkit.rdBase as rkrb
+import seaborn as sns
+import torch as th
+from PIL import Image as pilimg
 from rdkit import RDLogger
 from rdkit.Chem import Draw
-import rdkit.rdBase as rkrb
-import rdkit.RDLogger as rkl
-from PIL import Image as pilimg
-import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
-import seaborn as sns
 
 from Utility.utils import normalize_evaluation_metrics
 

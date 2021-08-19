@@ -1,26 +1,25 @@
 """PaccMann^RL: Policy gradient class"""
+import argparse
 import json
 import os
 import pickle
-import argparse
 
 import dgl
-import torch as th
-import pandas as pd
 import numpy as np
+import pandas as pd
 import pytorch_lightning as pl
-from rdkit import Chem
-from pytoda.transforms import LeftPadding, ToTensor
+import torch as th
+from ogb.utils import smiles2graph
 from pytoda.proteins.protein_language import ProteinLanguage
 from pytoda.smiles.smiles_language import SMILESLanguage
-from ogb.utils import smiles2graph
+from pytoda.transforms import LeftPadding, ToTensor
+from rdkit import Chem
 
-from Utility.data_utils import ProteinDataset
-from Utility.utils import dgl_graph, get_fingerprints
 from ChemVAE.ChemVAE_Module import ChemVAE_Module
-from ProtVAE.ProtVAE_Module import ProtVAE_Module
 from Predictor.PredictorBA_Module import PredictorBA_Module
 from Predictor.PredictorEFA_Module import PredictorEFA_Module
+from ProtVAE.ProtVAE_Module import ProtVAE_Module
+from Utility.data_utils import ProteinDataset
 from Utility.drug_evaluators import (
     AromaticRing,
     QED,
@@ -34,6 +33,7 @@ from Utility.drug_evaluators import (
 )
 from Utility.hyperparams import OPTIMIZER_FACTORY
 from Utility.search import SamplingSearch
+from Utility.utils import dgl_graph, get_fingerprints
 
 
 class Reinforce_Base(pl.LightningModule):
@@ -107,6 +107,11 @@ class Reinforce_Base(pl.LightningModule):
             default="Config/PredictorBA_protein_language.pkl",
         )
         parser.add_argument(
+            "--model_name",
+            type=str,
+            default="TEST",
+        )
+        parser.add_argument(
             "--predictor_model_name",
             type=str,
             default="EFA",
@@ -168,6 +173,7 @@ class Reinforce_Base(pl.LightningModule):
         pred_smiles_language_path,
         pred_protein_language_path,
         test_protein_id,
+        model_name,
         predictor_model_name,
         unbiased_predictions_path,
         merged_sequence_encoding_path,
@@ -182,6 +188,7 @@ class Reinforce_Base(pl.LightningModule):
         super(Reinforce_Base, self).__init__()
         # Default setting
         self.project_path = project_path
+        self.model_name = model_name
         self.predictor_model_name = predictor_model_name
         # Read the parameters json file
         self.params = dict()
@@ -235,7 +242,9 @@ class Reinforce_Base(pl.LightningModule):
             )
             # Load smiles and protein languages for predictor
             predictor_smiles_language = SMILESLanguage.load(pred_smiles_language_path)
-            predictor_protein_language = ProteinLanguage.load(pred_protein_language_path)
+            predictor_protein_language = ProteinLanguage.load(
+                pred_protein_language_path
+            )
             self.predictor._associate_language(predictor_smiles_language)
             self.predictor._associate_language(predictor_protein_language)
             # Set padding parameters
@@ -389,14 +398,14 @@ class Reinforce_Base(pl.LightningModule):
 
         # This is the joint reward function. Each score is normalized to be
         # inside the range [0, 1].
-        self.predictor_fw = (
+        self.get_pred = (
             self.get_efa_pred
             if self.predictor_model_name == "EFA"
             else self.get_ba_pred
         )
 
         self.reward_fn = lambda smiles, protein: (
-            self.affinity_weight * self.predictor_fw(smiles, protein, score=True)
+            self.affinity_weight * self.get_pred(smiles, protein, score=True)
             + th.Tensor([tox_f(s) for s in smiles]).to(self.device)
         )
         # discount factor
@@ -430,7 +439,7 @@ class Reinforce_Base(pl.LightningModule):
         # This is the joint reward function. Each score is normalized to be
         # inside the range [0, 1].
         self.reward_fn = lambda smiles, protein: (
-            self.affinity_weight * self.predictor_fw(smiles, protein, score=True)
+            self.affinity_weight * self.get_pred(smiles, protein, score=True)
             + th.Tensor([tox_f(s) for s in smiles]).to(self.device)
         )
 
@@ -488,9 +497,7 @@ class Reinforce_Base(pl.LightningModule):
     def enc_protein_to_numerical(self, protein):
         locations = [str(x) for x in range(768)]
         protein_encoding = self.protein_df.loc[protein][locations]
-        encoding_tensor = th.unsqueeze(th.Tensor(protein_encoding), 0).to(
-            self.device
-        )
+        encoding_tensor = th.unsqueeze(th.Tensor(protein_encoding), 0).to(self.device)
         return encoding_tensor
 
     def pred_protein_to_numerical(self, protein):
@@ -617,7 +624,7 @@ class Reinforce_Base(pl.LightningModule):
             latent_z, remove_invalid=remove_invalid
         )
         # Evaluate drugs
-        pred = self.predictor_fw(valid_smiles, protein)
+        pred = self.get_pred(valid_smiles, protein)
 
         if return_latent:
             return valid_smiles, pred.detach().squeeze(), latent_z
@@ -633,17 +640,21 @@ class Reinforce_Base(pl.LightningModule):
         pred, pred_dict = self.predictor(
             smiles_tensor, protein_tensor.repeat(smiles_tensor.shape[0], 1)
         )
-        return pred.detach().sequeeze() if score else pred
+        return pred.detach().squeeze() if score else pred
 
     def get_efa_pred(self, valid_smiles, protein, score=False):
         if len(valid_smiles) == 0:
             return 0
 
-        g = dgl.batch([dgl_graph(smiles2graph(smiles)) for smiles in valid_smiles]).to(self.device)
-        fp = th.as_tensor(get_fingerprints(valid_smiles), dtype=th.float32, device=self.device)
+        g = dgl.batch([dgl_graph(smiles2graph(smiles)) for smiles in valid_smiles]).to(
+            self.device
+        )
+        fp = th.as_tensor(
+            get_fingerprints(valid_smiles), dtype=th.float32, device=self.device
+        )
         pt = th.as_tensor(
             self.prottrans_enc[protein], dtype=th.float32, device=self.device
         ).repeat(len(valid_smiles), 1)
 
-        pred = self.predictorEFA(g, fp, pt)
-        return 1 / (1 + th.exp(pred.detach().sequeeze())) if score else pred
+        pred = self.predictor(g, fp, pt)
+        return 1 / (1 + th.exp(pred.detach().squeeze())) if score else pred

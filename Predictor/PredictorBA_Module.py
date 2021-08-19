@@ -2,10 +2,10 @@ import json
 from collections import OrderedDict
 
 import pytoda
-from pytoda.smiles.transforms import AugmentTensor
+import pytorch_lightning as pl
 import torch as th
 import torch.nn as nn
-import pytorch_lightning as pl
+from pytoda.smiles.transforms import AugmentTensor
 from sklearn.metrics import (
     auc,
     average_precision_score,

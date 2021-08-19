@@ -1,9 +1,9 @@
 import json
 from argparse import ArgumentParser
-
-import torch as th
-import pytorch_lightning as pl
 from typing import Optional, Union, Dict, List
+
+import pytorch_lightning as pl
+import torch as th
 from pytoda.datasets import DrugAffinityDataset
 from pytoda.proteins.protein_language import ProteinLanguage
 from pytoda.smiles.smiles_language import SMILESLanguage

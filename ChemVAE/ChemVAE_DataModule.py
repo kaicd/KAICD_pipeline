@@ -1,10 +1,10 @@
 import json
-import dill
 import os.path as osp
 from argparse import ArgumentParser
-
-import pytorch_lightning as pl
 from typing import Optional, Union, Dict, List
+
+import dill
+import pytorch_lightning as pl
 from pytoda.datasets import SMILESDataset
 from pytoda.smiles.smiles_language import SMILESLanguage
 from torch.utils.data.dataloader import DataLoader
